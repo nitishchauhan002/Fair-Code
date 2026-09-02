@@ -29,6 +29,10 @@
   var copyJsonBtn = document.getElementById('compareCopyJsonBtn');
   var mappingBlock = document.getElementById('compareMappingBlock');
   var mappingList = document.getElementById('compareMappingList');
+  var thresholdsBlock = document.getElementById('compareThresholdsBlock');
+  var thresholdControls = document.getElementById('compareThresholdControls');
+  var thresholdInputs = thresholdControls ?
+    Array.prototype.slice.call(thresholdControls.querySelectorAll('[data-opt]')) : [];
 
   // Kinds a column can be manually mapped to, plus Auto / Not-demographic.
   // Mirrors assets/profiler-ui.js's MAP_OPTIONS (issue #62's panel, ported
@@ -42,6 +46,7 @@
   var slot = { A: null, B: null };
   var currentCmp = null; // last successful compare() result, for export
   var currentOverrides = {}; // column -> forced kind, applied to both A and B
+  var currentOpts = {}; // threshold overrides (issue #351), applied to both A and B
 
   function pct(x) { return (x * 100).toFixed(1) + '%'; }
   function esc(s) {
@@ -145,15 +150,42 @@
     drop.classList.add('loaded');
     errorEl.hidden = true;
     currentOverrides = {}; // a changed input may have an entirely different schema
+    currentOpts = {};
+    resetThresholdInputs();
+    thresholdsBlock.hidden = false;
     renderMapping(); // rebuild the panel for the new column set (once per file load)
     maybeCompare();
   }
 
+  function resetThresholdInputs() {
+    thresholdInputs.forEach(function (input) {
+      input.value = '';
+      input.classList.remove('overridden');
+    });
+  }
+
+  thresholdInputs.forEach(function (input) {
+    input.addEventListener('input', function () {
+      var opt = input.dataset.opt;
+      var raw = input.value.trim();
+      if (raw === '') {
+        delete currentOpts[opt];
+        input.classList.remove('overridden');
+      } else {
+        var num = Number(raw);
+        if (Number.isNaN(num)) return;
+        currentOpts[opt] = num;
+        input.classList.add('overridden');
+      }
+      maybeCompare(false);
+    });
+  });
+
   function maybeCompare(scroll) {
     if (!slot.A || !slot.B) return;
     try {
-      var cmp = E.compare(E.profile(slot.A.table, currentOverrides),
-                          E.profile(slot.B.table, currentOverrides),
+      var cmp = E.compare(E.profile(slot.A.table, currentOverrides, currentOpts),
+                          E.profile(slot.B.table, currentOverrides, currentOpts),
                           slot.A.name, slot.B.name);
       errorEl.hidden = true;
       render(cmp, scroll !== false);
