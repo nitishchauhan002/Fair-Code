@@ -50,6 +50,10 @@ def parse_held_out_specs(specs, df: pd.DataFrame, read_table, *, flag="--proxy-h
         held_df = read_table(path)
         if column not in held_df.columns:
             raise ValueError(f"{flag} column '{column}' not found in {path}")
+        if column in df.columns:
+            raise ValueError(
+                f"{flag} column '{column}' already exists in the profiled dataset - "
+                f"held-out columns must not collide with a real one")
         if len(held_df) != len(df):
             raise ValueError(
                 f"{flag} {path} has {len(held_df)} row(s), but the profiled "

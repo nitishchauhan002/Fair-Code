@@ -391,6 +391,21 @@ def test_proxy_hints_with_unknown_column_returns_2_with_clean_error(tmp_path, ca
     assert f"column 'race' not found in {held_path}" in captured.err
 
 
+def test_proxy_hints_with_column_collision_returns_2_with_clean_error(tmp_path, capsys):
+    path = tmp_path / "a.csv"
+    held_path = tmp_path / "b.csv"
+    path.write_text("sex,race\nM,A\nF,B\n", encoding="utf-8")
+    held_path.write_text("race\nX\nY\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as exc_info:
+        main(["profile", str(path), "--proxy-hints",
+              "--proxy-hints-with", f"{held_path}=race"])
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 2
+    assert "column 'race' already exists in the profiled dataset" in captured.err
+
+
 def test_proxy_hints_with_row_count_mismatch_returns_2_with_clean_error(tmp_path, capsys):
     path = tmp_path / "a.csv"
     held_path = tmp_path / "b.csv"

@@ -237,6 +237,16 @@ def test_proxy_hints_held_out_with_malformed_spec_raises_value_error(tmp_path):
         _proxy_hints_impl(str(path), held_out_with=["noequalssign"])
 
 
+def test_proxy_hints_held_out_with_column_collision_raises_value_error(tmp_path):
+    path = tmp_path / "a.csv"
+    held_path = tmp_path / "b.csv"
+    path.write_text("sex,race\nM,A\nF,B\n", encoding="utf-8")
+    held_path.write_text("race\nX\nY\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="column 'race' already exists"):
+        _proxy_hints_impl(str(path), held_out_with=[f"{held_path}=race"])
+
+
 def test_build_server_registers_all_three_phase_one_tools():
     import asyncio
 
