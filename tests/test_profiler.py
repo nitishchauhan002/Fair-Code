@@ -35,6 +35,15 @@ def test_classify_rejects_false_positives():
     assert classify_name("LegalStatus") is None
 
 
+def test_classify_keyword_precedence_for_an_ambiguous_name():
+    # 'birth_state' matches both age's 'birth' keyword and geography's
+    # 'state' keyword - KEYWORDS' declared order (age before geography)
+    # decides it. Locks in the current, intentional precedence so a future
+    # reordering of KEYWORDS can't silently reclassify a name like this one
+    # with nothing to notice.
+    assert classify_name("birth_state") == "age"
+
+
 def test_detect_includes_low_cardinality_categorical():
     df = pd.DataFrame({"smoker": ["y", "n"] * 25})
     kinds = {d["name"]: d["kind"] for d in detect_columns(df)}
@@ -44,6 +53,16 @@ def test_detect_includes_low_cardinality_categorical():
 def test_high_cardinality_id_excluded_from_categorical():
     df = pd.DataFrame({"uid": [f"u{i}" for i in range(100)]})
     assert detect_columns(df) == []  # 100 distinct > MAX_CATEGORICAL_CARD
+
+
+def test_categorical_cardinality_boundary_at_max_categorical_card():
+    from faircode.detect import MAX_CATEGORICAL_CARD
+
+    at_limit = pd.DataFrame({"code": [f"c{i}" for i in range(MAX_CATEGORICAL_CARD)] * 5})
+    over_limit = pd.DataFrame({"code": [f"c{i}" for i in range(MAX_CATEGORICAL_CARD + 1)] * 5})
+
+    assert {d["name"] for d in detect_columns(at_limit)} == {"code"}
+    assert detect_columns(over_limit) == []
 
 
 # ── Age helpers ──────────────────────────────────────────────────────────────
