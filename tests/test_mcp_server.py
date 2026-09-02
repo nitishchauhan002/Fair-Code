@@ -452,6 +452,16 @@ def test_get_benchmark_results_invalid_kind_raises():
         _get_benchmark_results_impl(kind="not_a_real_kind")
 
 
+@pytest.mark.parametrize("bad_value", [{"x": 1}, ["a", "b"], (1, 2)])
+def test_get_benchmark_results_non_scalar_filter_raises_clean_error(bad_value):
+    # A dict raised an uncaught NotImplementedError and a list raised a raw
+    # pandas ValueError with internal shape-tuple wording - neither is the
+    # clean, caught error every other validation failure in this file gives
+    # (issue #390).
+    with pytest.raises(ValueError, match="audit must be a plain string"):
+        _get_benchmark_results_impl(audit=bad_value)
+
+
 def test_build_server_registers_all_phase_one_and_phase_two_tools():
     import asyncio
 

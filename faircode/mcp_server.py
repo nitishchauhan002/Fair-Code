@@ -304,7 +304,11 @@ def _get_benchmark_results_impl(kind="fairness", audit=None, model=None, strateg
     df = pd.read_csv(path)
     for column, value in (("audit", audit), ("model", model), ("strategy", strategy),
                           ("metric", metric), ("protected_attribute", protected_attribute)):
-        if value is not None and column in df.columns:
+        if value is None:
+            continue
+        if not isinstance(value, (str, int, float, bool)):
+            raise ValueError(f"{column} must be a plain string, got {type(value).__name__}")
+        if column in df.columns:
             df = df[df[column] == value]
     total = len(df)
     head = df.head(_RESULTS_ROW_LIMIT).astype(object)
