@@ -219,6 +219,35 @@ def test_to_terminal_marks_under_represented_group(mock_profile_result):
     assert "<- under-represented" in out
 
 
+def test_to_terminal_truncates_a_long_group_label_and_keeps_alignment(mock_profile_result):
+    label = "Not Hispanic or Latino"  # 22 chars, over the [:18] truncation
+    mock_profile_result["dimensions"][0]["groups"][0]["label"] = label
+
+    out = to_terminal(mock_profile_result)
+
+    assert label[:18] in out
+    assert label not in out  # the full, untruncated label must not appear
+    truncated_line = next(line for line in out.splitlines() if label[:18] in line)
+    # The truncated label pads to a fixed 18-char column, so the share
+    # percentage that follows still lands where every other row's does.
+    assert " 45.0%" in truncated_line
+
+
+def test_to_terminal_truncates_a_long_reference_group_label(mock_profile_result):
+    ref_label = "Some Long Reference Group Name"  # 31 chars, over [:16]
+    mock_profile_result["dimensions"][0]["reference"] = {
+        "deviation": 0.05,
+        "groups": [
+            {"label": ref_label, "expected": 0.5, "actual": 0.45, "delta": -0.05},
+        ],
+    }
+
+    out = to_terminal(mock_profile_result)
+
+    assert ref_label[:16] in out
+    assert ref_label not in out
+
+
 def test_to_terminal_renders_flags_section(mock_profile_result):
     out = to_terminal(mock_profile_result)
 
