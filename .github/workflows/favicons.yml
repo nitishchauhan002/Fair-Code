@@ -1,0 +1,54 @@
+name: Favicons
+
+# Verifies assets/icons/favicon-16x16.png, favicon-32x32.png, favicon.ico,
+# apple-touch-icon.png, icon-192.png, and icon-512.png are byte-exact with a
+# fresh `scripts/generate_favicons.py` run against assets/icons/logo.svg.
+#
+# Unlike assets/og/*.png (see build-explainers.yml and
+# scripts/check_generated_files_current.py's docstring), this IS safe to
+# byte-compare across platforms: generate_favicons.py only draws plain
+# rects via Pillow's ImageDraw, never text, so there's no FreeType
+# cross-platform rendering variance to worry about - confirmed directly
+# (a fresh regeneration against the currently-committed icons produces zero
+# diff).
+#
+# main requires a PR (branch protection), and github-actions[bot] isn't in
+# that ruleset's bypass list, so this can't auto-commit a fix by pushing
+# straight to main. Contributors already run `make favicons` locally after
+# editing logo.svg (see CONTRIBUTING.md) - this job just fails the check if
+# that step was skipped.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "assets/icons/logo.svg"
+      - "scripts/generate_favicons.py"
+  pull_request:
+    paths:
+      - "assets/icons/logo.svg"
+      - "scripts/generate_favicons.py"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install Pillow
+        run: python -m pip install --upgrade pip "pillow==11.1.0"
+
+      - name: Regenerate favicons from logo.svg
+        run: python3 scripts/generate_favicons.py
+
+      - name: Fail if the regenerated icons differ from what's committed
+        run: |
+          if ! git diff --exit-code -- assets/icons/; then
+            echo "::error::assets/icons/*.png and favicon.ico are out of date - run 'make favicons' locally and commit the result."
+            exit 1
+          fi
+          echo "OK: favicons are up to date with assets/icons/logo.svg."

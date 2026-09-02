@@ -136,6 +136,7 @@ Fair-Code/
 │       ├── citation.yml                 # validates CITATION.cff
 │       ├── codeowners-access.yml        # weekly: catches a CODEOWNER whose repo access has lapsed
 │       ├── codeql.yml                   # CodeQL static analysis
+│       ├── favicons.yml                 # regenerates favicons from logo.svg, checks they're current
 │       ├── first.interaction.yml        # Greets first-time issue/PR contributors
 │       ├── frozen-files.yml             # no-op (paper freeze lifted) - kept as a required status check
 │       ├── lint.yml                     # em-dash / broken-links / ruff checks
