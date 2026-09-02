@@ -309,7 +309,8 @@ Fair-Code/
 │   ├── icons/                           #   favicons + PWA icons
 │   ├── og/                              #   dark-theme OG share images, per explainer
 │   ├── og-light/                        #   light-theme counterparts
-│   └── profiler-engine.js, profiler-ui.js, profiler-compare.js, profiler.css   # client-side profiler
+│   ├── profiler-engine.js, profiler-ui.js, profiler-compare.js, profiler.css   # client-side profiler
+│   └── explainers-data.json, explainers-data.js, explainers-ui.js, explainers.css   # client-side explainer index
 ├── explainer.html                       # static ?slug= redirect shim -> explainers/<slug>.html (see DEAD-FILE-AUDIT.md)
 ├── index.html                           # live at thefaircode.xyz
 ├── profiler.html                        # Open Dataset Profiler - client-side web tool
