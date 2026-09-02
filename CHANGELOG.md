@@ -3,8 +3,8 @@
 # Changelog
 
 ![Keep a Changelog](https://img.shields.io/badge/Keep%20a%20Changelog-1.1.0-e05735?style=flat-square)
-![SemVer](https://img.shields.io/badge/SemVer-2.1.1-blue?style=flat-square)
-![Latest](https://img.shields.io/badge/Latest-v2.1.1-brightgreen?style=flat-square)
+![SemVer](https://img.shields.io/badge/SemVer-2.2.0-blue?style=flat-square)
+![Latest](https://img.shields.io/badge/Latest-v2.2.0-brightgreen?style=flat-square)
 
 All notable changes to Fair Code are documented here, newest first.
 
@@ -16,6 +16,26 @@ All notable changes to Fair Code are documented here, newest first.
 > actually submitted this cycle - the real paper, with fresh results, is now planned for next year.
 > `paper/results-frozen/` (tag [`v1.0-paper`](https://github.com/yakew7/Fair-Code/releases/tag/v1.0-paper))
 > is kept as a historical reference snapshot. See [CLAUDE.md](CLAUDE.md).
+
+## [2.2.0] - 02 Sep 2026
+
+Three rounds of a fresh MCP-focused audit, each finding real gaps through direct verification
+(not guessed), fixing them, and adding one Phase 2 capability - completing the "read-only lookups
+against `paper/results-frozen/` and `explainers/`" plan named as a follow-up when the MCP server
+first shipped.
+
+### Added
+- **MCP Phase 2: `list_explainers`/`get_explainer`** - read-only lookups against this repo's own published explainers, so an agent can discover and read one without shelling out. `list_explainers(tag=None)` returns every explainer's slug/title/subtitle/summary/tags straight from `assets/explainers-data.json`; `get_explainer(slug)` returns the raw Markdown source plus metadata.
+- **MCP Phase 2: `get_benchmark_results`** - filters `results_fairness.csv`/`results_performance.csv` by audit/model/strategy/metric/protected_attribute, capped at 200 rows so an unfiltered call can't flood the calling agent's context.
+- **`faircode/_explainers/` and `faircode/_results_frozen/`** - package-internal, generated mirrors of `explainers/*.md`+`explainers-data.json` and the frozen benchmark CSVs, declared as real `package-data` (closes #388). `explainers/` and `paper/results-frozen/` live outside what `pyproject.toml` ships, so a real `pip install faircode[mcp]` never had them on disk - every Phase 2 tool would have raised `FileNotFoundError` for any real end user. Verified end-to-end twice: built an actual wheel, installed it in a clean venv, confirmed both tool groups work with zero repo checkout present. `scripts/build_explainers.py` and `scripts/freeze_paper_results.py` now generate these mirrors automatically.
+
+### Fixed
+- **MCP tools accepted `path="-"` (stdin), which could hang or corrupt the stdio JSON-RPC transport** (closes #385) - `"-"` is a real, documented CLI shorthand for reading a terminal/pipe on stdin; the MCP server runs *over* stdio, so a tool call reading stdin would block on/consume the same stream the server needs for its own protocol frames. Now rejected with a clear error in the single chokepoint every path argument funnels through.
+- **MCP tools silently dropped the multi-sheet `.xlsx` "ignored sheet" notice** (closes #386) - the CLI already reports this for every dataset-reading path; none of the three Phase 1 tools did. Now attached as `sheet_note`/`sheet_note_a`+`sheet_note_b`/`sheet_notes`.
+- **`get_explainer` had a path-traversal vulnerability via `slug`** (closes #387) - `slug="../README"` returned this repo's `README.md` content, a file entirely outside `explainers/`, since `slug` was used to build a filesystem path with zero validation. Now validated against the exact pattern every real slug matches before the path is ever built.
+- **`profile_dataset`'s `cross` validation didn't reject the same column twice, unlike the CLI** (closes #389) - `cross=["sex","sex"]` silently produced a degenerate diagonal-only intersection table instead of erroring like `faircode profile --cross sex,sex` already does.
+- **`get_benchmark_results` crashed uncaught or leaked raw pandas errors on a non-scalar filter value** (closes #390) - a dict value raised an uncaught `NotImplementedError` (not in the tool wrapper's except tuple); a list value raised `ValueError` with pandas' own internal wording. Each filter is now validated as a plain scalar first.
+- **README.md's MCP section still listed only the original 3 tools** (closes #391) - `SPEC.md` section 11 was already correctly updated for all six.
 
 ## [2.1.1] - 02 Sep 2026
 

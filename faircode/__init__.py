@@ -19,4 +19,4 @@ from .compare import compare
 from .profiler import profile
 
 __all__ = ["profile", "compare"]
-__version__ = "2.1.1"
+__version__ = "2.2.0"
