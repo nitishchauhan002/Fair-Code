@@ -26,6 +26,24 @@ requires_scipy = pytest.mark.skipif(
     reason="optional 'proxy' extra not installed",
 )
 
+requires_openpyxl = pytest.mark.skipif(
+    importlib.util.find_spec("openpyxl") is None,
+    reason="optional 'excel' extra not installed",
+)
+
+
+def _write_multi_sheet_xlsx(path, first_col, first_rows):
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    first = wb.active
+    first.title = "Data"
+    first.append([first_col])
+    for row in first_rows:
+        first.append([row])
+    wb.create_sheet("Notes")
+    wb.save(path)
+
 
 def test_profile_dataset_matches_the_shape_profile_returns(tmp_path):
     path = tmp_path / "a.csv"
@@ -65,12 +83,51 @@ def test_profile_dataset_unknown_file_raises_a_clear_message(tmp_path):
         _profile_dataset_impl(str(tmp_path / "does-not-exist.csv"))
 
 
+def test_profile_dataset_rejects_stdin_shorthand():
+    # "-" reads real stdin at the CLI, but MCP runs over a stdio transport
+    # where stdin IS the JSON-RPC channel - must be rejected, not attempted.
+    with pytest.raises(ValueError, match="stdin input"):
+        _profile_dataset_impl("-")
+
+
+def test_compare_datasets_rejects_stdin_shorthand(tmp_path):
+    path = tmp_path / "a.csv"
+    path.write_text("sex\nM\nF\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="stdin input"):
+        _compare_datasets_impl(str(path), "-")
+
+
+def test_proxy_hints_rejects_stdin_shorthand():
+    with pytest.raises(ValueError, match="stdin input"):
+        _proxy_hints_impl("-")
+
+
 def test_profile_dataset_unknown_override_column_raises(tmp_path):
     path = tmp_path / "a.csv"
     path.write_text("sex\nM\nF\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="overrides column"):
         _profile_dataset_impl(str(path), overrides={"not_a_real_column": "sex"})
+
+
+@requires_openpyxl
+def test_profile_dataset_reports_ignored_sheets(tmp_path):
+    path = tmp_path / "multi_sheet.xlsx"
+    _write_multi_sheet_xlsx(path, "sex", ["M"] * 5 + ["F"] * 5)
+
+    result = _profile_dataset_impl(str(path))
+
+    assert result["sheet_note"] == "read sheet 'Data' - 1 other sheet(s) ignored"
+
+
+def test_profile_dataset_single_sheet_xlsx_has_no_sheet_note(tmp_path):
+    path = tmp_path / "a.csv"
+    path.write_text("sex\nM\nF\n", encoding="utf-8")
+
+    result = _profile_dataset_impl(str(path))
+
+    assert "sheet_note" not in result
 
 
 def test_profile_dataset_invalid_override_kind_raises(tmp_path):
@@ -146,6 +203,19 @@ def test_compare_datasets_unknown_override_column_raises(tmp_path):
         _compare_datasets_impl(str(path_a), str(path_b), overrides={"nope": "sex"})
 
 
+@requires_openpyxl
+def test_compare_datasets_reports_ignored_sheets_for_both_files(tmp_path):
+    path_a = tmp_path / "a.xlsx"
+    path_b = tmp_path / "b.xlsx"
+    _write_multi_sheet_xlsx(path_a, "sex", ["M"] * 5 + ["F"] * 5)
+    _write_multi_sheet_xlsx(path_b, "sex", ["M"] * 5 + ["F"] * 5)
+
+    result = _compare_datasets_impl(str(path_a), str(path_b))
+
+    assert result["sheet_note_a"] == "read sheet 'Data' - 1 other sheet(s) ignored"
+    assert result["sheet_note_b"] == "read sheet 'Data' - 1 other sheet(s) ignored"
+
+
 def test_compare_datasets_proxy_hints_defaults_off(tmp_path):
     path_a = tmp_path / "a.csv"
     path_a.write_text("sex\nM\nF\n", encoding="utf-8")
@@ -216,6 +286,21 @@ def test_proxy_hints_runtime_error_propagates_with_a_clean_message(tmp_path, mon
 
     with pytest.raises(RuntimeError, match="proxy hints need scipy"):
         _proxy_hints_impl(str(path))
+
+
+@requires_openpyxl
+def test_proxy_hints_reports_ignored_sheets_for_main_path_and_held_out(tmp_path):
+    path = tmp_path / "a.xlsx"
+    held_path = tmp_path / "held.xlsx"
+    _write_multi_sheet_xlsx(path, "sex", ["M"] * 5 + ["F"] * 5)
+    _write_multi_sheet_xlsx(held_path, "race", ["A"] * 5 + ["B"] * 5)
+
+    result = _proxy_hints_impl(str(path), held_out_with=[f"{held_path}=race"])
+
+    assert result["sheet_notes"] == [
+        "read sheet 'Data' - 1 other sheet(s) ignored",
+        "read sheet 'Data' - 1 other sheet(s) ignored",
+    ]
 
 
 @requires_scipy

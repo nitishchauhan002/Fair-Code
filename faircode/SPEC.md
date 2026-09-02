@@ -384,7 +384,15 @@ An anticipated failure (an unreadable path, an unknown `overrides` column, `prox
 the `proxy` extra installed) is raised inside the tool as a plain Python exception and converted to
 an MCP `ToolError` at the tool boundary, so the actual message reaches the calling agent - any other
 exception is treated by the SDK as a crash and replaced with a generic `Error executing tool <name>`,
-withholding the real text.
+withholding the real text. A path of `"-"` (the CLI's documented stdin shorthand, section 2) is
+explicitly rejected as a `ToolError` rather than attempted: this server runs over stdio transport, so
+stdin is the JSON-RPC channel itself, and reading it inside a tool call would block on/consume the
+same stream the server needs for its own protocol frames. See issue #385.
+
+A multi-sheet `.xlsx` path attaches the same "read sheet 'X' - N other sheet(s) ignored" notice the
+CLI already prints to stderr, as a `sheet_note` field (`sheet_note_a`/`sheet_note_b` on
+`compare_datasets`; `sheet_notes`, a list, on `proxy_hints` covering both `path` and any
+`held_out_with` files) - omitted entirely when nothing was ignored. See issue #386.
 
 `proxy_hints` only tests columns present in the dataset given by default, so it cannot flag a
 remaining column as a proxy for a protected attribute that has already been dropped from the

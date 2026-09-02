@@ -29,7 +29,7 @@ from __future__ import annotations
 from . import __version__
 from .compare import compare
 from .detect import VALID_KINDS
-from .loaders_extra import read_table
+from .loaders_extra import get_xlsx_sheet_info, read_table
 from .profiler import _resolve_opts, parse_reference, profile
 from .provenance import build as build_provenance
 from .proxy import parse_held_out_specs
@@ -41,7 +41,15 @@ _MAP_CHOICES = VALID_KINDS + ("ignore",)
 def _read_table_or_raise(path: str):
     """Read a table, translating loader failures into a clear message instead
     of a raw pandas/parser traceback. Mirrors cli.py's _read_or_exit, minus
-    the SystemExit - a tool function should raise, not exit the process."""
+    the SystemExit - a tool function should raise, not exit the process.
+
+    Rejects "-" (the CLI's documented stdin shorthand) before it ever reaches
+    loaders_extra.py's sys.stdin.read(): this server runs over stdio
+    transport, so stdin is the JSON-RPC channel itself - reading it inside a
+    tool call would block on/consume the same stream the server needs for
+    its own protocol frames (see issue #385)."""
+    if path == "-":
+        raise ValueError("stdin input ('-') is not supported over MCP - pass a real file path instead")
     try:
         return read_table(path)
     except FileNotFoundError:
@@ -50,6 +58,21 @@ def _read_table_or_raise(path: str):
         raise
     except Exception as exc:  # noqa: BLE001 - surface any parse failure plainly
         raise RuntimeError(f"could not read dataset {path}: {exc}") from exc
+
+
+def _sheet_note(path):
+    """The same "read sheet 'X' - N other sheet(s) ignored" notice cli.py
+    prints to stderr for a multi-sheet .xlsx path, or None if `path` isn't a
+    multi-sheet .xlsx - the MCP tools had no equivalent at all (issue #386),
+    silently profiling only the first sheet with nothing telling the calling
+    agent other sheets existed."""
+    info = get_xlsx_sheet_info(path)
+    if info is None:
+        return None
+    sheet_name, ignored_sheets = info
+    if not ignored_sheets:
+        return None
+    return f"read sheet '{sheet_name}' - {len(ignored_sheets)} other sheet(s) ignored"
 
 
 def _check_overrides(overrides, known_columns):
@@ -96,6 +119,9 @@ def _profile_dataset_impl(path, overrides=None, cross=None, reference_path=None,
     opts = _build_opts(min_share, intersection_floor, imbalance_flag,
                        missing_flag, min_group_size, cross, reference_path)
     result = profile(df, overrides, opts)
+    note = _sheet_note(path)
+    if note:
+        result["sheet_note"] = note
     if include_provenance:
         digests = [("dataset_hash", path)]
         if reference_path:
@@ -118,6 +144,11 @@ def _compare_datasets_impl(path_a, path_b, overrides=None,
     profile_a = profile(df_a, overrides, opts)
     profile_b = profile(df_b, overrides, opts)
     result = compare(profile_a, profile_b, name_a=path_a, name_b=path_b)
+    note_a, note_b = _sheet_note(path_a), _sheet_note(path_b)
+    if note_a:
+        result["sheet_note_a"] = note_a
+    if note_b:
+        result["sheet_note_b"] = note_b
     if proxy_hints:
         result["proxy_hints_a"] = compute_proxy_hints(df_a, profile_a["dimensions"])
         result["proxy_hints_b"] = compute_proxy_hints(df_b, profile_b["dimensions"])
@@ -156,7 +187,12 @@ def _proxy_hints_impl(path, overrides=None, min_share=None, min_group_size=None,
     result = profile(df, overrides, opts)
     held_out = parse_held_out_specs(held_out_with, df, _read_table_or_raise,
                                     flag="held_out_with") if held_out_with else None
-    return {"hints": compute_proxy_hints(df, result["dimensions"], held_out=held_out)}
+    output = {"hints": compute_proxy_hints(df, result["dimensions"], held_out=held_out)}
+    notes = [n for n in (_sheet_note(path),) if n]
+    notes += [n for spec in (held_out_with or []) for n in (_sheet_note(spec.partition("=")[0]),) if n]
+    if notes:
+        output["sheet_notes"] = notes
+    return output
 
 
 def build_server():
