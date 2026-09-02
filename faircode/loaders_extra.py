@@ -58,10 +58,12 @@ def read_table(path: str) -> pd.DataFrame:
         #
         # pandas' "columns" and "index" orientations both use a
         # dict-of-dicts representation, so their shapes are inherently
-        # ambiguous in JSON. A columns-oriented export using the default
-        # DataFrame index has numeric inner keys ("0", "1", ...). Preserve
-        # that existing/common case and treat other scalar dict-of-dicts as
-        # index-oriented.
+        # ambiguous in JSON.
+        #
+        # Heuristic: when the dict-of-dicts is scalar and rectangular, prefer
+        # the orientation implied by which dimension is larger (rows vs
+        # columns). For square cases, use value type-homogeneity to prefer
+        # columns-orient (columns are often homogeneous; rows often mix types).
         if isinstance(parsed, dict) and parsed and all(
             isinstance(value, dict) for value in parsed.values()
         ):
