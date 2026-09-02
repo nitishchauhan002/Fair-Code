@@ -10,6 +10,11 @@ boundary the CLI already has: nothing here is a new capability, just a
 different way to call the same profile()/compare()/proxy_hints() functions
 cli.py already wraps. See faircode/SPEC.md section 11 for the tool contract.
 
+Phase 2 (list_explainers, get_explainer) adds read-only lookups against
+this repo's own explainers/ - the plan mentioned in CHANGELOG.md's Phase 1
+note. A results-frozen/ benchmark-results lookup is a possible further
+follow-up, not implemented here.
+
 Needs the optional 'mcp' extra (`pip install faircode[mcp]`).
 
 Tool logic lives in plain, directly-callable `_*_impl` functions (this
@@ -26,6 +31,9 @@ withholding the real text.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from . import __version__
 from .compare import compare
 from .detect import VALID_KINDS
@@ -36,6 +44,13 @@ from .proxy import parse_held_out_specs
 from .proxy import proxy_hints as compute_proxy_hints
 
 _MAP_CHOICES = VALID_KINDS + ("ignore",)
+
+# Phase 2 of the plan discussed for #327-#329 (see CHANGELOG.md's Phase 1
+# note): read-only lookups against explainers/, so an agent can discover and
+# read an explainer without shelling out or re-deriving the index itself.
+ROOT = Path(__file__).resolve().parent.parent
+EXPLAINERS_DIR = ROOT / "explainers"
+EXPLAINERS_DATA_JSON = ROOT / "assets" / "explainers-data.json"
 
 
 def _read_table_or_raise(path: str):
@@ -195,8 +210,48 @@ def _proxy_hints_impl(path, overrides=None, min_share=None, min_group_size=None,
     return output
 
 
+def _load_explainers_metadata():
+    return json.loads(EXPLAINERS_DATA_JSON.read_text(encoding="utf-8"))
+
+
+def _list_explainers_impl(tag=None):
+    """Lists every published explainer's metadata (slug/title/subtitle/
+    summary/tags), optionally filtered to those carrying `tag`. Reads the
+    same assets/explainers-data.json the website's index page does, so it's
+    always exactly the current published set - never re-derived or cached
+    separately."""
+    entries = _load_explainers_metadata()
+    if tag:
+        entries = [e for e in entries if tag in e.get("tags", [])]
+        if not entries:
+            raise ValueError(f"no explainer has tag {tag!r}")
+    return {"explainers": [
+        {"slug": e["slug"], "title": e["title"], "subtitle": e.get("subtitle"),
+         "summary": e.get("summary"), "tags": e.get("tags", [])}
+        for e in entries
+    ]}
+
+
+def _get_explainer_impl(slug):
+    """Returns one explainer's full Markdown source plus its metadata, by
+    slug (as listed by list_explainers). Raises a clear error for an unknown
+    slug rather than a raw FileNotFoundError with a confusing local path."""
+    path = EXPLAINERS_DIR / f"{slug}.md"
+    if not path.is_file():
+        raise FileNotFoundError(f"no explainer found for slug {slug!r}")
+    meta = next((e for e in _load_explainers_metadata() if e["slug"] == slug), {})
+    return {
+        "slug": slug,
+        "title": meta.get("title"),
+        "subtitle": meta.get("subtitle"),
+        "tags": meta.get("tags", []),
+        "content": path.read_text(encoding="utf-8"),
+    }
+
+
 def build_server():
-    """Build the MCPServer instance with every Phase 1 tool registered."""
+    """Build the MCPServer instance with every Phase 1 and Phase 2 tool
+    registered."""
     from mcp.server.mcpserver import MCPServer
     from mcp.server.mcpserver.exceptions import ToolError
 
@@ -208,7 +263,9 @@ def build_server():
             "compare two datasets for representation drift, or flag columns "
             "that may be a statistical proxy for a protected attribute - all "
             "locally, no data leaves this machine. Wraps the same faircode "
-            "Python API the `faircode` CLI uses."
+            "Python API the `faircode` CLI uses. Also exposes read-only "
+            "lookups against this repo's published explainers "
+            "(list_explainers, get_explainer)."
         ),
     )
 
@@ -309,6 +366,33 @@ def build_server():
         try:
             return _proxy_hints_impl(path, overrides, min_share, min_group_size, held_out_with)
         except (ValueError, FileNotFoundError, RuntimeError) as exc:
+            raise _as_tool_error(exc) from exc
+
+    @server.tool()
+    def list_explainers(tag: str | None = None) -> dict:
+        """List every published Fair Code explainer's metadata: slug, title,
+        subtitle, summary, and topic tags. Pass `tag` (e.g. "detection",
+        "metrics", "healthcare") to filter to explainers carrying it - see an
+        untagged call's results for the full set of tags in use. Returns
+        {"explainers": [...]}. Use the `slug` from a result with
+        get_explainer to read that explainer's full text.
+        """
+        try:
+            return _list_explainers_impl(tag)
+        except ValueError as exc:
+            raise _as_tool_error(exc) from exc
+
+    @server.tool()
+    def get_explainer(slug: str) -> dict:
+        """Read one explainer's full Markdown source and metadata, by the
+        `slug` a list_explainers call returned (e.g. "demographic-parity",
+        "proxy-variables"). Returns {"slug", "title", "subtitle", "tags",
+        "content"} - `content` is the raw Markdown, the same source the
+        website renders to HTML from.
+        """
+        try:
+            return _get_explainer_impl(slug)
+        except (ValueError, FileNotFoundError) as exc:
             raise _as_tool_error(exc) from exc
 
     return server

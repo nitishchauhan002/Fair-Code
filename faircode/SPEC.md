@@ -371,8 +371,10 @@ parity obligation of its own - there is no equivalent MCP surface for the JS eng
 | `profile_dataset` | `profile()` | Same shape as `profile --json` (section 6), `provenance` (section 10) attached by default via `include_provenance` |
 | `compare_datasets` | `compare()` | Same shape as `compare --json` (section 8), `dataset_hash_a`/`dataset_hash_b` in provenance; `proxy_hints=true` attaches `proxy_hints_a`/`proxy_hints_b`, matching `compare --proxy-hints` |
 | `proxy_hints` | `proxy_hints()` | Returns `{"hints": [...]}`, never a bare list - a list return value gets split by the MCP SDK into one content block per element, and an empty list becomes zero blocks, indistinguishable from an error to a caller |
+| `list_explainers` | `assets/explainers-data.json` | Phase 2: read-only lookup, no analysis. Returns `{"explainers": [{slug, title, subtitle, summary, tags}, ...]}`; optional `tag` filters to explainers carrying it, erroring if none match |
+| `get_explainer` | `explainers/<slug>.md` | Phase 2: returns `{slug, title, subtitle, tags, content}` - `content` is the raw Markdown source. Errors clearly (`FileNotFoundError`) for an unknown slug |
 
-All three tools accept `overrides` (the section 1 `{column: kind}` map, as a JSON object rather
+The first three tools accept `overrides` (the section 1 `{column: kind}` map, as a JSON object rather
 than repeated `--map COL=KIND` strings) and the relevant section 7 thresholds by name.
 `profile_dataset` also accepts `cross` and `reference_path`, matching `profile`'s `--cross` and
 `--reference`; `compare_datasets` does not, matching `compare`'s own flag set. `proxy_hints` only
@@ -400,3 +402,8 @@ dataset entirely - unless `held_out_with` is given: a list of `"PATH=COLUMN"` st
 CLI's `--proxy-hints-with`, each naming a file whose rows align 1:1 with the profiled dataset and a
 column to pull the dropped attribute's original values from. Parsed via `proxy.py`'s shared
 `parse_held_out_specs`, so the validation is identical to the CLI's. See section 3 and issue #328.
+
+`list_explainers`/`get_explainer` carry no dataset-reading trust boundary at all - they only read
+this repo's own `assets/explainers-data.json` and `explainers/*.md`, never a caller-supplied path -
+and use the same `ValueError`/`FileNotFoundError` → `ToolError` conversion as the other three tools
+for an unknown `tag` or `slug`.

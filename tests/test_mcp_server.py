@@ -16,6 +16,8 @@ pytest.importorskip("mcp", reason="MCP tools need the optional mcp extra")
 
 from faircode.mcp_server import (  # noqa: E402
     _compare_datasets_impl,
+    _get_explainer_impl,
+    _list_explainers_impl,
     _profile_dataset_impl,
     _proxy_hints_impl,
     build_server,
@@ -340,13 +342,52 @@ def test_proxy_hints_held_out_with_column_collision_raises_value_error(tmp_path)
         _proxy_hints_impl(str(path), held_out_with=[f"{held_path}=race"])
 
 
-def test_build_server_registers_all_three_phase_one_tools():
+def test_list_explainers_returns_metadata_for_every_published_explainer():
+    result = _list_explainers_impl()
+
+    assert result["explainers"]  # the real, current published set - not empty
+    slugs = {e["slug"] for e in result["explainers"]}
+    assert "proxy-variables" in slugs
+    entry = next(e for e in result["explainers"] if e["slug"] == "proxy-variables")
+    assert set(entry) == {"slug", "title", "subtitle", "summary", "tags"}
+    assert entry["title"] == "Proxy Variables"
+
+
+def test_list_explainers_filters_by_tag():
+    result = _list_explainers_impl(tag="detection")
+
+    assert result["explainers"]
+    assert all("detection" in e["tags"] for e in result["explainers"])
+
+
+def test_list_explainers_unknown_tag_raises():
+    with pytest.raises(ValueError, match="no explainer has tag"):
+        _list_explainers_impl(tag="not-a-real-tag")
+
+
+def test_get_explainer_returns_content_and_metadata():
+    result = _get_explainer_impl("proxy-variables")
+
+    assert result["slug"] == "proxy-variables"
+    assert result["title"] == "Proxy Variables"
+    assert "# Explainer: What is a Proxy Variable?" in result["content"]
+
+
+def test_get_explainer_unknown_slug_raises():
+    with pytest.raises(FileNotFoundError, match="no explainer found for slug"):
+        _get_explainer_impl("not-a-real-explainer")
+
+
+def test_build_server_registers_all_phase_one_and_phase_two_tools():
     import asyncio
 
     server = build_server()
     tools = asyncio.run(server.list_tools())
 
-    assert {t.name for t in tools} == {"profile_dataset", "compare_datasets", "proxy_hints"}
+    assert {t.name for t in tools} == {
+        "profile_dataset", "compare_datasets", "proxy_hints",
+        "list_explainers", "get_explainer",
+    }
 
 
 def test_tool_errors_surface_the_anticipated_message_not_a_generic_one():
@@ -389,4 +430,18 @@ def test_proxy_hints_tool_error_surfaces_via_call_tool():
         return await server.call_tool("proxy_hints", {"path": "definitely-missing.csv"})
 
     with pytest.raises(ToolError, match="file not found: definitely-missing.csv"):
+        asyncio.run(call())
+
+
+def test_get_explainer_tool_error_surfaces_via_call_tool():
+    import asyncio
+
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    server = build_server()
+
+    async def call():
+        return await server.call_tool("get_explainer", {"slug": "not-a-real-explainer"})
+
+    with pytest.raises(ToolError, match="no explainer found for slug"):
         asyncio.run(call())
