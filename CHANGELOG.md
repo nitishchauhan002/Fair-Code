@@ -3,8 +3,8 @@
 # Changelog
 
 ![Keep a Changelog](https://img.shields.io/badge/Keep%20a%20Changelog-1.1.0-e05735?style=flat-square)
-![SemVer](https://img.shields.io/badge/SemVer-2.1.0-blue?style=flat-square)
-![Latest](https://img.shields.io/badge/Latest-v2.1.0-brightgreen?style=flat-square)
+![SemVer](https://img.shields.io/badge/SemVer-2.1.1-blue?style=flat-square)
+![Latest](https://img.shields.io/badge/Latest-v2.1.1-brightgreen?style=flat-square)
 
 All notable changes to Fair Code are documented here, newest first.
 
@@ -17,7 +17,25 @@ All notable changes to Fair Code are documented here, newest first.
 > `paper/results-frozen/` (tag [`v1.0-paper`](https://github.com/yakew7/Fair-Code/releases/tag/v1.0-paper))
 > is kept as a historical reference snapshot. See [CLAUDE.md](CLAUDE.md).
 
-## [Unreleased]
+## [2.1.1] - 02 Sep 2026
+
+A full sweep of the issue backlog opened alongside this release: 24 non-explainer issues
+(#347, #348, #349, #350, #351, #352, #342, #343, #364-#384), each verified, fixed, and committed
+individually.
+
+### Added
+- **MCP `proxy_hints` tool gained `held_out_with`** (closes #348) - mirrors the CLI's `--proxy-hints-with`, letting an MCP-calling agent test a protected attribute already dropped from the dataset. Extracted the CLI's `PATH=COLUMN` parsing into `proxy.py`'s shared `parse_held_out_specs` so both interfaces validate identically instead of duplicating the logic.
+- **MCP `compare_datasets` tool gained `proxy_hints`** (closes #349) - mirrors `compare --proxy-hints`, attaching `proxy_hints_a`/`proxy_hints_b` in one call instead of requiring three separate MCP calls to reconstruct.
+- **Web profiler's Compare tab gained an Advanced-thresholds panel** (closes #351) - the Profile view already had one wired to `min_share`/`intersection_floor`/`imbalance_flag`/`missing_flag`/`min_group_size`; Compare was the one surface stuck with defaults. Threaded a new `currentOpts` through `maybeCompare()`'s two `E.profile()` calls the same way `currentOverrides` already is.
+- **Test coverage for `scripts/render_terminal_png.py`** (closes #368) - zero coverage despite a documented platform-specific font-path regression (#323); also adds `scripts/__init__.py`, without which `importlib.import_module("scripts.*")` is a namespace-package lookup that can silently lose to an unrelated same-named package elsewhere on `sys.path`.
+- **Test coverage for `loaders_extra.py`'s real parquet `ImportError`→`RuntimeError` conversion** (closes #369) - the CLI's own test bypassed it entirely by mocking `read_table` directly.
+- **Test coverage for `get_xlsx_sheet_info`'s non-`.xlsx` and except-`Exception` branches** (closes #370).
+- **Test coverage for the MCP `ToolError` wrapper on `compare_datasets`/`proxy_hints`** (closes #371) - only `profile_dataset` had a `call_tool`-based test proving the wrapper's exception conversion actually works end-to-end.
+- **Test coverage for `detect.py`'s keyword precedence and `MAX_CATEGORICAL_CARD` boundary** (closes #372) - `classify_name("birth_state")` resolving to `"age"` was untested and undocumented as intentional; the categorical-cardinality cutoff was only tested well past its boundary.
+- **Test coverage for `scripts/check_generated_files_current.py`** (closes #373) - this CI gate, whose own docstring documents three failed attempts at reliable cross-platform OG-image drift detection, had zero tests protecting that hard-won logic.
+- **Test coverage for `report.py`'s group-label truncation slices** (closes #374) - no fixture used a label long enough to hit the `[:18]`/`[:16]` truncation.
+- **JS/Python parity tests now exercise non-default options** (closes #376) - every prior parity test used the default `profile()` path only; `--map`/`--cross`/`--reference`/thresholds had zero cross-engine coverage. `scripts/engine-js.js`'s `profile` command now accepts an optional `opts.json`.
+- **CI staleness check for favicons** (closes #381) - `generate_og_images.py` had one; `generate_favicons.py` didn't. Safe to byte-compare across platforms (no font rendering, unlike OG images) - new `favicons.yml` workflow.
 
 ### Fixed
 - **`PROJECT_ANCHORS`/`projectAnchors` maps were missing Tenant Screening** (closes #350, by [@propcgamer20-png](https://github.com/propcgamer20-png), [#357](https://github.com/yakew7/Fair-Code/pull/357)) - both `scripts/build_explainers.py`'s Python map and `assets/explainers-ui.js`'s JS map listed six of the seven audits, so the `[Tenant Screening/](../Tenant%20Screening/)` related-project link in `equal-opportunity.html` and `fairness-through-unawareness.html` never resolved to `../index.html#project-tenant` the way every other audit link does. Also dropped a dead, misspelled legacy JS key (`'Ai Fair Recrutment Dataset'`) that had no Python-side counterpart.
@@ -25,6 +43,17 @@ All notable changes to Fair Code are documented here, newest first.
 - **`llms.txt` was missing the 6 most recently added explainers** (closes #342, by [@evanjain-dot](https://github.com/evanjain-dot), [#361](https://github.com/yakew7/Fair-Code/pull/361)) - `llms.txt` is maintained separately from `llms-full.txt` and had drifted: accuracy-equality, bootstrap-confidence-intervals, mitigation-strategies, fairness-through-unawareness, lime, and counterfactual-explanation were all published but invisible to anything that only reads the short index.
 - **`scripts/check_em_dash.py` never scanned `.yml`/`.yaml` files** (closes #343, by [@propcgamer20-png](https://github.com/propcgamer20-png), [#362](https://github.com/yakew7/Fair-Code/pull/362)) - the em-dash-free convention is meant to apply repo-wide, but `SCAN_EXT` excluded YAML entirely, leaving two real em dashes in `new_audit.yml`/`new_explainer.yml` unflagged by CI. Added `.yml`/`.yaml` to `SCAN_EXT` and allowlisted those two files, which intentionally show the banned character inside a checkbox label - the same reason `CONTRIBUTING.md` is already allowlisted.
 - **Nothing cross-checked the plain-prose "N explainers" count across README.md, CONTRIBUTORS.md, METRICS.md, and ROADMAP.md** (closes #352, by [@evanjain-dot](https://github.com/evanjain-dot), [#363](https://github.com/yakew7/Fair-Code/pull/363)) - a small, explicit list of exact regexes (not a fuzzy scan - METRICS.md's weekly log is full of legitimate historical counts a loose match would false-positive on) now guards four docs files, wired into `build-explainers.yml`. Also fixed the drift the check immediately caught: CONTRIBUTORS.md's maintainer bio still said "the bulk of the 39 explainers" against a real count of 53. A same-day follow-up pushed directly to `main` closed the one gap flagged in review - README.md's Traction table has its own independent "Explainers Published" row that the original check missed - and added a `--fix` mode (`make fix-explainer-count`) so a contributor never has to hand-edit these four files themselves; CI still only checks, since a `pull_request` run from a fork gets a read-only token and couldn't push a fix back anyway.
+- **`faircode profile --reference`/`--cross` silently no-opped on a typo'd column** (closes #364, #384) - a reference column or cross pair that didn't match any profiled dimension was silently ignored (zero reference flags) or silently replaced with the first two detected dimensions, instead of erroring like `--map` already does. Both now raise a clear error naming the unmatched column(s); the MCP tools get the fix for free through their existing exception-conversion.
+- **`--proxy-hints-with` silently overwrote a real column on a name collision** (closes #365) - `proxy_hints()`'s held-out map unconditionally overwrote a same-named real column with no warning. Now rejected at parse time.
+- **`faircode benchmark` raised a raw traceback when matplotlib alone was missing** (closes #366) - the top-level scikit-learn/pyyaml/fairlearn import already converted a missing dependency into a clean error; `write_report`'s lazy matplotlib import (only reached without `--no-plots`) didn't.
+- **`--proxy-hints-with` gave no ignored-sheet notice for a multi-sheet `.xlsx` held-out file** (closes #367) - every other dataset-reading path already reports this.
+- **Web profiler's Compare tab "Copy as JSON" omitted the provenance block** (closes #375) - the Profile tab's export already attaches `faircode_version`/`engine`/a dataset hash/resolved params; Compare's export was the raw `compare()` result with none of it.
+- **Web profiler's threshold-input placeholders were a hardcoded, driftable copy of the engine's real defaults** (closes #377) - now sourced from the engine's own `DEFAULT_OPTS` at init, in both the Profile and Compare views.
+- **Inconsistent `accept` MIME lists across the web profiler's four file inputs** (closes #378).
+- **CODEOWNERS: all 7 audit dataset directories were unowned except `audit.yaml`** (closes #379) - 42 tracked files (fair.py/unfair.py/CSVs/notebooks) had no reviewer. Six of the seven directory names need GitHub's backslash-escaped-space syntax, which `tests/test_codeowners.py`'s own parser didn't support - fixed the parser too.
+- **CODEOWNERS: the explainer system's JS/CSS files were missing from Educational content** (closes #380).
+- **README.md's `assets/` repo-tree omitted the explainer system's client-side files** (closes #382).
+- **`bug_report.yml`'s "Which file?" dropdown had no `audit.yaml` option** (closes #383).
 
 ## [2.1.0] - 30 Aug 2026
 
