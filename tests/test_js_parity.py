@@ -78,6 +78,45 @@ def test_python_js_profiler_parity(csv_name):
     assert javascript_result == python_result
 
 
+def test_python_js_profiler_parity_with_overrides_cross_and_thresholds(tmp_path):
+    """Non-default options - --map/--cross/--reference/thresholds - only ever
+    had cross-engine parity coverage for their default-off path (issue #376).
+    A future change to either _resolve_opts (Python) or resolveOpts (JS), or
+    to either engine's override-handling branch, could silently diverge here
+    with nothing in this suite to catch it."""
+    csv = CSV_PATHS["adult.csv"]
+    overrides = {"education": "categorical"}
+    reference = {"race": {"White": 0.7, "Black": 0.2, "Other": 0.1}}
+    opts = {"cross": ["age", "race"], "min_group_size": 500, "reference": reference}
+
+    python_result = profile(pd.read_csv(csv), overrides, opts)
+
+    opts_path = tmp_path / "opts.json"
+    opts_path.write_text(json.dumps({"overrides": overrides, "opts": opts}), encoding="utf-8")
+
+    completed = subprocess.run(
+        ["node", "scripts/engine-js.js", "profile", str(csv), str(opts_path)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+    )
+    javascript_result = json.loads(completed.stdout)
+
+    python_result = dict(python_result)
+    javascript_result = dict(javascript_result)
+    python_result.pop("flags", None)
+    javascript_result.pop("flags", None)
+
+    assert javascript_result == python_result
+    # Confirm the options actually took effect on both sides, not just that
+    # both silently ignored them the same way.
+    assert any(d["name"] == "education" and d["kind"] == "categorical"
+               for d in python_result["dimensions"])
+    assert python_result["intersections"][0]["dims"] == ["age", "race"]
+    assert any("reference" in d for d in python_result["dimensions"])
+
+
 def test_python_js_json_parity_inconsistent_keys():
     """Records-orient JSON where later records add columns the first one
     doesn't have (#144). The JS parseJSON() used to derive columns from only

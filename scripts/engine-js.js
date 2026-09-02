@@ -6,10 +6,15 @@
 // see #170.
 //
 // Usage:
-//   node scripts/engine-js.js profile <dataset.csv>
+//   node scripts/engine-js.js profile <dataset.csv> [opts.json]
 //   node scripts/engine-js.js profile-json <dataset.json>
 //   node scripts/engine-js.js profile-xlsx <dataset.xlsx>
 //   node scripts/engine-js.js compare <a.csv> <b.csv>
+//
+// opts.json (profile only, optional) is a JSON file shaped
+// {"overrides": {...}, "opts": {...}}, threaded straight through to
+// E.profile(table, overrides, opts) - lets tests/test_js_parity.py exercise
+// --map/--cross/--reference/threshold parity, not just the default path.
 
 const fs = require("fs");
 const os = require("os");
@@ -21,7 +26,7 @@ const NO_NETWORK_EXIT_CODE = 3;
 function usageError() {
   console.error(
     "Usage:\n" +
-    "  node scripts/engine-js.js profile <dataset.csv>\n" +
+    "  node scripts/engine-js.js profile <dataset.csv> [opts.json]\n" +
     "  node scripts/engine-js.js profile-json <dataset.json>\n" +
     "  node scripts/engine-js.js profile-xlsx <dataset.xlsx>\n" +
     "  node scripts/engine-js.js compare <a.csv> <b.csv>"
@@ -56,10 +61,11 @@ async function fetchXLSXLibrary() {
 async function main() {
   const [command, ...args] = process.argv.slice(2);
 
-  if (command === "profile" && args.length === 1) {
+  if (command === "profile" && (args.length === 1 || args.length === 2)) {
     const E = loadEngine();
     const table = E.parseCSV(fs.readFileSync(args[0], "utf8"));
-    process.stdout.write(JSON.stringify(E.profile(table)));
+    const extra = args[1] ? JSON.parse(fs.readFileSync(args[1], "utf8")) : {};
+    process.stdout.write(JSON.stringify(E.profile(table, extra.overrides, extra.opts)));
     return;
   }
 
