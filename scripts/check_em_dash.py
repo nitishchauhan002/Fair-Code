@@ -19,8 +19,8 @@ from pathlib import Path
 EM_DASH = "\u2014"  # em dash, the forbidden character
 EN_DASH = "\u2013"  # en dash, allowed for numeric ranges
 
-# Only contributor-facing source/prose is scanned. Data (.csv) and dependency
-# pins (.txt) are deliberately out of scope.
+# Tracked text files with these extensions are scanned for em dashes. Data (.csv)
+# and dependency pins (.txt) are deliberately out of scope.
 SCAN_EXT = {".md", ".py", ".js", ".html", ".css", ".yml", ".yaml"}
 
 # Opt-out path list (the escape hatch): files that legitimately contain an em
