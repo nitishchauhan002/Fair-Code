@@ -34,6 +34,12 @@
   var thresholdControls = document.getElementById('thresholdControls');
   var thresholdInputs = thresholdControls ?
     Array.prototype.slice.call(thresholdControls.querySelectorAll('[data-opt]')) : [];
+  // Placeholders come from the engine's own defaults (issue #377), not a
+  // hardcoded copy in profiler.html that could silently drift from them.
+  thresholdInputs.forEach(function (input) {
+    var def = E.DEFAULT_OPTS && E.DEFAULT_OPTS[input.dataset.opt];
+    if (def !== undefined) input.placeholder = String(def);
+  });
 
   var currentResult = null;
   var currentFile = null;

@@ -914,5 +914,10 @@
   global.FairCodeProfiler = { parseCSV: parseCSV, parseJSON: parseJSON, parseXLSX: parseXLSX,
                               sniffDelimiter: sniffDelimiter,
                               profile: profile, compare: compare,
-                              parseReference: parseReference };
+                              parseReference: parseReference,
+                              // Exposed so the Profile/Compare threshold-input
+                              // placeholders (issue #377) can be sourced from
+                              // this single source of truth instead of a
+                              // hardcoded, driftable copy in profiler.html.
+                              DEFAULT_OPTS: DEFAULT_OPTS };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
