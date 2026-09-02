@@ -971,11 +971,13 @@ so an exported report can be tied back to what produced it - see
 [faircode/SPEC.md](faircode/SPEC.md#10-export-provenance). It is derived purely
 from the inputs, so `--json` stays reproducible; `--no-provenance` omits it.
 
-**MCP server - for coding agents.** `faircode-mcp` exposes `profile_dataset`, `compare_datasets`,
-and `proxy_hints` as [MCP](https://modelcontextprotocol.io) tools over stdio, so an MCP-aware
-agent can profile a file mid-conversation instead of shelling out to the CLI and parsing text.
-Same local-only trust boundary as the CLI - stdio, no network listener, no auth; nothing here is a
-new capability. Point a client at it with:
+**MCP server - for coding agents.** `faircode-mcp` exposes six [MCP](https://modelcontextprotocol.io)
+tools over stdio: `profile_dataset`, `compare_datasets`, and `proxy_hints` wrap the same analysis
+engine the CLI uses, so an MCP-aware agent can profile a file mid-conversation instead of shelling
+out and parsing text; `list_explainers`, `get_explainer`, and `get_benchmark_results` are read-only
+lookups against this repo's own published explainers and frozen benchmark results. Same local-only
+trust boundary as the CLI - stdio, no network listener, no auth; nothing here is a new capability.
+Point a client at it with:
 
 ```json
 { "mcpServers": { "faircode": { "command": "faircode-mcp" } } }
