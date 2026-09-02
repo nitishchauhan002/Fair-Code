@@ -34,7 +34,7 @@ ordered by merged PR count, most first - ties broken by commit count, then by ea
 date. Within each entry, the PR numbers link the claim to the actual diff, so nothing here is an
 unverifiable "thanks to".
 
-**Snapshot:** 2026-08-31, covering everything merged through **PR #359**.
+**Snapshot:** 2026-09-02, covering everything merged through **PR #363**.
 Anything merged after that date is real and welcome, but is not yet reflected here - the
 [contributors graph](https://github.com/yakew7/Fair-Code/graphs/contributors) is always the live
 source of truth, and the `contrib.rocks` grid above regenerates from it automatically.
@@ -113,7 +113,7 @@ Ordered by merged PR count, most first (ties broken by commit count, then by ear
 
 ### Evan Jain - [@evanjain-dot](https://github.com/evanjain-dot)
 
-**9 merged PRs · 34 commits · first merged 2026-05-18**
+**11 merged PRs · 39 commits · first merged 2026-05-18**
 
 Author of the second PR ever merged into the repo. Three explainers plus a CI check:
 [Sampling Bias](explainers/sampling-bias.md) ([#2](https://github.com/yakew7/Fair-Code/pull/2)),
@@ -131,15 +131,21 @@ Readmission's real 11.2% base rate rather than an invented one. Most recently, f
 for every previously-untested `--map`/`--cross`/`--reference`/`--proxy-hints`/`--html` error branch
 ([#277](https://github.com/yakew7/Fair-Code/pull/277), closing issues #268 and #269), and added the
 `benchmark` extra's missing `matplotlib` package to the CLI docstring and README
-([#279](https://github.com/yakew7/Fair-Code/pull/279), closing issue #244). Most recently, made
+([#279](https://github.com/yakew7/Fair-Code/pull/279), closing issue #244). Then made
 `faircode profile --proxy-hints-with` error clearly when passed without `--proxy-hints` instead of
-silently no-opping ([#359](https://github.com/yakew7/Fair-Code/pull/359), closing issue #347).
+silently no-opping ([#359](https://github.com/yakew7/Fair-Code/pull/359), closing issue #347), added
+the 6 most recently published explainers `llms.txt` had drifted out of sync with
+([#361](https://github.com/yakew7/Fair-Code/pull/361), closing issue #342). Most recently, added
+`scripts/check_explainer_count.py`, cross-checking the plain-prose "N explainers" count across
+README.md, CONTRIBUTORS.md, METRICS.md, and ROADMAP.md against the real count of `explainers/*.md`,
+wired into `build-explainers.yml` ([#363](https://github.com/yakew7/Fair-Code/pull/363), closing
+issue #352).
 
 ### [@propcgamer20-png](https://github.com/propcgamer20-png)
 
-**8 merged PRs · 21 commits · first merged 2026-07-06**
+**10 merged PRs · 27 commits · first merged 2026-07-06**
 
-The [Predictive Parity](explainers/predictive-parity.md) explainer ([#72](https://github.com/yakew7/Fair-Code/pull/72)) - the ProPublica vs. Northpointe dispute as two correct fairness checks that cannot both hold. Then the contributor tooling: [`Makefile`](Makefile), [`.pre-commit-config.yaml`](.pre-commit-config.yaml), and the local-setup section of [CONTRIBUTING.md](CONTRIBUTING.md) ([#125](https://github.com/yakew7/Fair-Code/pull/125), closing issue #114). Later refactored the first-interaction workflow to find a contributor's genuinely earliest issue/PR ([#227](https://github.com/yakew7/Fair-Code/pull/227)), and added proper `<th scope="col">`/`<caption>` markup to `faircode/report.py`'s HTML report tables ([#260](https://github.com/yakew7/Fair-Code/pull/260), closing issue #254). Then test coverage for `generate_favicons.py`'s malformed-`logo.svg` error paths ([#278](https://github.com/yakew7/Fair-Code/pull/278), closing issue #245), and the missing `proxy` extra in `audits.yml`'s profiler job install line ([#311](https://github.com/yakew7/Fair-Code/pull/311), closing issue #298). Then a bundled four-issue PR: `faircode compare` reporting ignored `.xlsx` sheets, the stale "five audits" README wording, the `bug_report.yml` audit dropdown missing two domains, and `CODEOWNERS` missing `profiler.css` ([#314](https://github.com/yakew7/Fair-Code/pull/314), closing issues #300, #308, #307, and #310). Most recently, added Tenant Screening to the `PROJECT_ANCHORS`/`projectAnchors` anchor maps that turn a related-project Markdown link into a homepage anchor, fixing the one audit missing from both ([#357](https://github.com/yakew7/Fair-Code/pull/357), closing issue #350).
+The [Predictive Parity](explainers/predictive-parity.md) explainer ([#72](https://github.com/yakew7/Fair-Code/pull/72)) - the ProPublica vs. Northpointe dispute as two correct fairness checks that cannot both hold. Then the contributor tooling: [`Makefile`](Makefile), [`.pre-commit-config.yaml`](.pre-commit-config.yaml), and the local-setup section of [CONTRIBUTING.md](CONTRIBUTING.md) ([#125](https://github.com/yakew7/Fair-Code/pull/125), closing issue #114). Later refactored the first-interaction workflow to find a contributor's genuinely earliest issue/PR ([#227](https://github.com/yakew7/Fair-Code/pull/227)), and added proper `<th scope="col">`/`<caption>` markup to `faircode/report.py`'s HTML report tables ([#260](https://github.com/yakew7/Fair-Code/pull/260), closing issue #254). Then test coverage for `generate_favicons.py`'s malformed-`logo.svg` error paths ([#278](https://github.com/yakew7/Fair-Code/pull/278), closing issue #245), and the missing `proxy` extra in `audits.yml`'s profiler job install line ([#311](https://github.com/yakew7/Fair-Code/pull/311), closing issue #298). Then a bundled four-issue PR: `faircode compare` reporting ignored `.xlsx` sheets, the stale "five audits" README wording, the `bug_report.yml` audit dropdown missing two domains, and `CODEOWNERS` missing `profiler.css` ([#314](https://github.com/yakew7/Fair-Code/pull/314), closing issues #300, #308, #307, and #310). Then added Tenant Screening to the `PROJECT_ANCHORS`/`projectAnchors` anchor maps that turn a related-project Markdown link into a homepage anchor, fixing the one audit missing from both ([#357](https://github.com/yakew7/Fair-Code/pull/357), closing issue #350). Most recently, added `.yml`/`.yaml` to `check_em_dash.py`'s scanned extensions and allowlisted the two issue templates that intentionally demonstrate the banned character ([#362](https://github.com/yakew7/Fair-Code/pull/362), closing issue #343).
 
 ### Anay Dhawan - [@AnayDhawan](https://github.com/AnayDhawan)
 
