@@ -27,8 +27,6 @@ from __future__ import annotations
 import argparse
 import sys
 
-import pandas as pd
-
 from . import __version__
 from .compare import compare
 from .detect import VALID_KINDS
@@ -39,7 +37,7 @@ from .loaders_extra import get_xlsx_sheet_info, read_table
 # import _r`) and keeps profiler.py - a parity-sensitive file - untouched.
 from .profiler import _resolve_opts, parse_reference, profile
 from .provenance import build as build_provenance
-from .proxy import proxy_hints
+from .proxy import parse_held_out_specs, proxy_hints
 from .report import compare_to_terminal, to_html, compare_to_html, to_json, to_terminal
 
 _MAP_CHOICES = VALID_KINDS + ("ignore",)
@@ -75,29 +73,15 @@ def _check_map_columns(overrides, known_columns):
 
 
 def _build_held_out(specs, df):
-    """Parse repeated --proxy-hints-with PATH=COLUMN flags into a
-    {column: pandas.Series} map aligned to `df`'s index, for proxy_hints()'s
-    held_out param. Prints a plain error and raises SystemExit(2) on any
-    parse failure, missing column, or row-count mismatch."""
-    held_out = {}
-    for spec in specs or []:
-        path, sep, column = spec.partition("=")
-        if not sep or not path or not column:
-            print(f"error: invalid --proxy-hints-with '{spec}', expected PATH=COLUMN",
-                  file=sys.stderr)
-            raise SystemExit(2)
-        held_df = _read_or_exit(path)
-        if column not in held_df.columns:
-            print(f"error: --proxy-hints-with column '{column}' not found in {path}",
-                  file=sys.stderr)
-            raise SystemExit(2)
-        if len(held_df) != len(df):
-            print(f"error: --proxy-hints-with {path} has {len(held_df)} row(s), but "
-                  f"the profiled dataset has {len(df)} - rows must align 1:1",
-                  file=sys.stderr)
-            raise SystemExit(2)
-        held_out[column] = pd.Series(held_df[column].to_numpy(), index=df.index)
-    return held_out
+    """Parse repeated --proxy-hints-with PATH=COLUMN flags via proxy.py's
+    shared parse_held_out_specs, printing a plain error and raising
+    SystemExit(2) on any parse failure, missing column, or row-count
+    mismatch - _read_or_exit already does the same for an unreadable path."""
+    try:
+        return parse_held_out_specs(specs, df, _read_or_exit)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(2)
 
 
 def _read_or_exit(path: str):

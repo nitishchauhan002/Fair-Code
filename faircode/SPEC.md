@@ -386,6 +386,9 @@ an MCP `ToolError` at the tool boundary, so the actual message reaches the calli
 exception is treated by the SDK as a crash and replaced with a generic `Error executing tool <name>`,
 withholding the real text.
 
-`proxy_hints` carries the same limitation documented in section 3: it only tests columns present in
-the dataset given, so it cannot flag a remaining column as a proxy for a protected attribute that has
-already been dropped from the dataset entirely. See issue #328.
+`proxy_hints` only tests columns present in the dataset given by default, so it cannot flag a
+remaining column as a proxy for a protected attribute that has already been dropped from the
+dataset entirely - unless `held_out_with` is given: a list of `"PATH=COLUMN"` strings mirroring the
+CLI's `--proxy-hints-with`, each naming a file whose rows align 1:1 with the profiled dataset and a
+column to pull the dropped attribute's original values from. Parsed via `proxy.py`'s shared
+`parse_held_out_specs`, so the validation is identical to the CLI's. See section 3 and issue #328.

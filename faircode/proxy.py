@@ -31,6 +31,33 @@ def _labelize(df, name, kind):
     return df[name].astype("object")
 
 
+def parse_held_out_specs(specs, df: pd.DataFrame, read_table, *, flag="--proxy-hints-with"):
+    """Parse repeated PATH=COLUMN specs into a {column: pandas.Series} map
+    aligned to `df`'s index, for proxy_hints()'s `held_out` param. Shared by
+    the CLI's `--proxy-hints-with` and the MCP `proxy_hints` tool's
+    `held_out_with`, so both get the same parse/column/row-count validation
+    without re-implementing it. Raises ValueError on any parse failure or
+    row-count mismatch; `read_table` is injected so a bad path's own failure
+    (missing file, unreadable format) surfaces however the caller's `read_table`
+    reports it - this function never prints or exits, only raises. `flag`
+    names the caller's own flag/parameter in error messages.
+    """
+    held_out = {}
+    for spec in specs or []:
+        path, sep, column = spec.partition("=")
+        if not sep or not path or not column:
+            raise ValueError(f"invalid {flag} '{spec}', expected PATH=COLUMN")
+        held_df = read_table(path)
+        if column not in held_df.columns:
+            raise ValueError(f"{flag} column '{column}' not found in {path}")
+        if len(held_df) != len(df):
+            raise ValueError(
+                f"{flag} {path} has {len(held_df)} row(s), but the profiled "
+                f"dataset has {len(df)} - rows must align 1:1")
+        held_out[column] = pd.Series(held_df[column].to_numpy(), index=df.index)
+    return held_out
+
+
 def proxy_hints(df: pd.DataFrame, dimensions: list, alpha=PROXY_ALPHA,
                 held_out: dict | None = None) -> list:
     """Chi-squared test of independence over every pair of detected dimensions.

@@ -32,6 +32,7 @@ from .detect import VALID_KINDS
 from .loaders_extra import read_table
 from .profiler import _resolve_opts, parse_reference, profile
 from .provenance import build as build_provenance
+from .proxy import parse_held_out_specs
 from .proxy import proxy_hints as compute_proxy_hints
 
 _MAP_CHOICES = VALID_KINDS + ("ignore",)
@@ -124,11 +125,18 @@ def _compare_datasets_impl(path_a, path_b, overrides=None,
     return result
 
 
-def _proxy_hints_impl(path, overrides=None, min_share=None, min_group_size=None):
+def _proxy_hints_impl(path, overrides=None, min_share=None, min_group_size=None,
+                      held_out_with=None):
     """Only min_share/min_group_size are exposed - they're the only two
     threshold knobs that feed dimension detection (profiler.py's
     _dimension()); intersection_floor/imbalance_flag/missing_flag affect
     intersections/flags, which this tool never touches.
+
+    `held_out_with` mirrors the CLI's --proxy-hints-with: a list of
+    "PATH=COLUMN" strings for testing a protected attribute that's already
+    been dropped from the dataset at `path`. Parsed via proxy.py's shared
+    parse_held_out_specs, so the column/row-count validation is identical to
+    the CLI's.
 
     Returns a dict, not a bare list: the MCP SDK splits a list return value
     into one content block per element (confirmed - a 98-item result became
@@ -142,7 +150,9 @@ def _proxy_hints_impl(path, overrides=None, min_share=None, min_group_size=None)
     _check_overrides(overrides, df.columns)
     opts = _build_opts(min_share=min_share, min_group_size=min_group_size)
     result = profile(df, overrides, opts)
-    return {"hints": compute_proxy_hints(df, result["dimensions"])}
+    held_out = parse_held_out_specs(held_out_with, df, _read_table_or_raise,
+                                    flag="held_out_with") if held_out_with else None
+    return {"hints": compute_proxy_hints(df, result["dimensions"], held_out=held_out)}
 
 
 def build_server():
@@ -227,7 +237,8 @@ def build_server():
     @server.tool()
     def proxy_hints(path: str, overrides: dict[str, str] | None = None,
                     min_share: float | None = None,
-                    min_group_size: int | None = None) -> dict:
+                    min_group_size: int | None = None,
+                    held_out_with: list[str] | None = None) -> dict:
         """Flag pairs of detected demographic columns that are strongly
         statistically associated (chi-squared test of independence, p < 0.05)
         - a "this column may be a proxy for that protected attribute" signal.
@@ -236,15 +247,18 @@ def build_server():
 
         Needs the optional 'scipy' extra (`pip install faircode[proxy]`).
 
-        This only tests columns present in the dataset given: if a protected
-        attribute has already been dropped entirely (a common but naive
-        attempt at "fixing" bias by removing the sensitive column), nothing
-        here can flag a remaining column as a proxy for it - that failure
-        mode is a known, documented limitation, not something this tool
-        detects. See faircode/SPEC.md section 3 and issue #328.
+        This only tests columns present in the dataset at `path` by default:
+        if a protected attribute has already been dropped entirely (a common
+        but naive attempt at "fixing" bias by removing the sensitive column),
+        nothing here can flag a remaining column as a proxy for it unless
+        `held_out_with` is given. `held_out_with` is a list of "PATH=COLUMN"
+        strings (mirroring the CLI's --proxy-hints-with flag), each pointing
+        at a file whose rows align 1:1 with `path` and a column to pull the
+        dropped attribute's original values from. See faircode/SPEC.md
+        section 3 and issue #328.
         """
         try:
-            return _proxy_hints_impl(path, overrides, min_share, min_group_size)
+            return _proxy_hints_impl(path, overrides, min_share, min_group_size, held_out_with)
         except (ValueError, FileNotFoundError, RuntimeError) as exc:
             raise _as_tool_error(exc) from exc
 

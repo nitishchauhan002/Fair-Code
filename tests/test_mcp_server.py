@@ -170,13 +170,40 @@ def test_proxy_hints_runtime_error_propagates_with_a_clean_message(tmp_path, mon
     path = tmp_path / "a.csv"
     path.write_text("sex\nM\nF\n", encoding="utf-8")
 
-    def raise_runtime(_df, _dimensions):
+    def raise_runtime(_df, _dimensions, **_kwargs):
         raise RuntimeError("proxy hints need scipy (install with: pip install faircode[proxy])")
 
     monkeypatch.setattr(mcp_server, "compute_proxy_hints", raise_runtime)
 
     with pytest.raises(RuntimeError, match="proxy hints need scipy"):
         _proxy_hints_impl(str(path))
+
+
+@requires_scipy
+def test_proxy_hints_held_out_with_flags_a_dropped_column(tmp_path):
+    # zip_code is perfectly aligned with race, which has been dropped from
+    # the profiled dataset - only visible via held_out_with.
+    path = tmp_path / "dropped.csv"
+    held_path = tmp_path / "full.csv"
+    zip_code = (["111"] * 100 + ["222"] * 100)
+    race = (["A"] * 100 + ["B"] * 100)
+    path.write_text("zip_code\n" + "\n".join(zip_code), encoding="utf-8")
+    held_path.write_text("zip_code,race\n" +
+                         "\n".join(f"{z},{r}" for z, r in zip(zip_code, race)),
+                         encoding="utf-8")
+
+    result = _proxy_hints_impl(str(path), held_out_with=[f"{held_path}=race"])
+
+    pair = next(h for h in result["hints"] if {h["a"], h["b"]} == {"zip_code", "race"})
+    assert pair["p_value"] < 0.05
+
+
+def test_proxy_hints_held_out_with_malformed_spec_raises_value_error(tmp_path):
+    path = tmp_path / "a.csv"
+    path.write_text("sex\nM\nF\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid held_out_with 'noequalssign'"):
+        _proxy_hints_impl(str(path), held_out_with=["noequalssign"])
 
 
 def test_build_server_registers_all_three_phase_one_tools():
