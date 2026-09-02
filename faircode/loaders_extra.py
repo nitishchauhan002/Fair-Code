@@ -69,16 +69,10 @@ def read_table(path: str) -> pd.DataFrame:
         ):
             inner_key_sets = [set(row.keys()) for row in parsed.values()]
 
-            same_inner_keys = len(
-                {frozenset(keys) for keys in inner_key_sets}
-            ) == 1
+            same_inner_keys = len({frozenset(keys) for keys in inner_key_sets}) == 1
 
             if same_inner_keys:
                 inner_keys = inner_key_sets[0]
-
-                inner_keys_are_default_index = inner_keys == {
-                    str(i) for i in range(len(inner_keys))
-                }
 
                 cells_are_scalar = all(
                     not isinstance(cell, (dict, list))
@@ -86,9 +80,27 @@ def read_table(path: str) -> pd.DataFrame:
                     for cell in row.values()
                 )
 
-                if cells_are_scalar and not inner_keys_are_default_index:
-                    return pd.read_json(path, orient="index")
+                if cells_are_scalar:
+                    outer_n = len(parsed)
+                    inner_n = len(inner_keys)
 
+                    if outer_n != inner_n:
+                        orient = "index" if outer_n > inner_n else "columns"
+                        return pd.read_json(path, orient=orient)
+
+                    # Square case: prefer columns-orient when values are more type-homogeneous
+                    # by column than by row.
+                    row_type_score = sum(
+                        len({type(cell) for cell in row.values()})
+                        for row in parsed.values()
+                    )
+                    col_type_score = sum(
+                        len({type(parsed[row_key][col_key]) for row_key in parsed})
+                        for col_key in inner_keys
+                    )
+
+                    orient = "index" if row_type_score > col_type_score else "columns"
+                    return pd.read_json(path, orient=orient)
         return pd.read_json(path)
 
     if suffix == ".parquet":
