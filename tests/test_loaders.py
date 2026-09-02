@@ -11,7 +11,7 @@ import pytest
 
 from faircode import profile
 from faircode.loaders import _sniff_delimiter
-from faircode.loaders_extra import read_table
+from faircode.loaders_extra import get_xlsx_sheet_info, read_table
 
 requires_openpyxl = pytest.mark.skipif(
     importlib.util.find_spec("openpyxl") is None,
@@ -136,6 +136,25 @@ def test_read_table_parquet_missing_pyarrow_raises_clean_runtime_error(tmp_path,
 
     with pytest.raises(RuntimeError, match="reading .parquet files requires the 'pyarrow' package"):
         read_table(str(path))
+
+
+def test_get_xlsx_sheet_info_returns_none_for_non_xlsx_path(tmp_path):
+    path = tmp_path / "data.csv"
+    path.write_text("a,b\n1,2\n", encoding="utf-8")
+
+    assert get_xlsx_sheet_info(str(path)) is None
+
+
+@requires_openpyxl
+def test_get_xlsx_sheet_info_returns_none_for_a_corrupt_xlsx_file(tmp_path):
+    # Genuinely unreadable content behind an .xlsx extension - the
+    # except Exception: return None fallback, previously never exercised.
+    # read_table()'s own error path is what's meant to surface this failure
+    # instead, so this only checks the fallback doesn't itself misbehave.
+    path = tmp_path / "corrupt.xlsx"
+    path.write_bytes(b"not a real xlsx file")
+
+    assert get_xlsx_sheet_info(str(path)) is None
 
 
 def test_read_table_unknown_extension_sniffs_tabs(tmp_path):
