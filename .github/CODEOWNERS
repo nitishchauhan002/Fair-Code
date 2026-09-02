@@ -49,6 +49,9 @@
 # =========================
 /explainers/ @yakew7 @Shreyash0712
 /assets/explainers-data.json @yakew7
+/assets/explainers-data.js @yakew7
+/assets/explainers-ui.js @yakew7
+/assets/explainers.css @yakew7
 
 # =========================
 # Website assets
