@@ -8,7 +8,10 @@ name: Build Explainers
 # explainer - not byte- or pixel-compared against this job's own fresh
 # regeneration, since Pillow's bundled FreeType renders text with
 # genuinely different pixels across platforms (see
-# scripts/check_generated_files_current.py's docstring).
+# scripts/check_generated_files_current.py's docstring). Also verifies the
+# plain-prose "N explainers" mentions in README.md, CONTRIBUTORS.md,
+# METRICS.md, and ROADMAP.md haven't drifted from the real count of
+# explainers/*.md (scripts/check_explainer_count.py).
 #
 # main requires a PR (branch protection), and github-actions[bot] isn't in
 # that ruleset's bypass list, so this can no longer auto-commit a fix by
@@ -27,6 +30,11 @@ on:
       - "scripts/build_explainers.py"
       - "scripts/generate_og_images.py"
       - "scripts/check_generated_files_current.py"
+      - "scripts/check_explainer_count.py"
+      - "README.md"
+      - "CONTRIBUTORS.md"
+      - "METRICS.md"
+      - "ROADMAP.md"
   pull_request:
     paths:
       - "explainers/**.md"
@@ -35,6 +43,11 @@ on:
       - "scripts/build_explainers.py"
       - "scripts/generate_og_images.py"
       - "scripts/check_generated_files_current.py"
+      - "scripts/check_explainer_count.py"
+      - "README.md"
+      - "CONTRIBUTORS.md"
+      - "METRICS.md"
+      - "ROADMAP.md"
 
 jobs:
   check:
@@ -67,3 +80,6 @@ jobs:
         # existence/size/dimensions instead, which is platform-independent.
         # Text-based generated files still get an exact git diff.
         run: python3 scripts/check_generated_files_current.py
+
+      - name: Fail if a "current explainer count" mention has drifted
+        run: python3 scripts/check_explainer_count.py

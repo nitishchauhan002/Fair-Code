@@ -1166,7 +1166,7 @@ The full public roadmap - with phases, completion status, and content schedule -
 | Combined Social Reach (Instagram + LinkedIn) | 30K+ |
 | Countries Reached (Website Visitors) | 18 |
 | Code Audits Published | 7 |
-| Explainers Published | 47 |
+| Explainers Published | 53 |
 
 Tracked weekly in [METRICS.md](METRICS.md).
 
