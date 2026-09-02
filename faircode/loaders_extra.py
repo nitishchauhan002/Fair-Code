@@ -36,6 +36,7 @@ def read_table(path: str) -> pd.DataFrame:
     if suffix == ".json":
         with open(path, "r", encoding="utf-8") as f:
             raw = f.read()
+
         try:
             parsed = json.loads(raw)
         except json.JSONDecodeError as exc:
@@ -43,15 +44,49 @@ def read_table(path: str) -> pd.DataFrame:
             # file) is an internal/version-specific message. Fail fast with
             # a clear message instead, mirroring the JS engine's parseJSON().
             raise ValueError(f"Unsupported JSON format (not valid JSON: {exc}).") from exc
-        # Detect split-orient ({"columns": [...], "data": [...]}, optionally
-        # "index") from the parsed shape rather than trying the default
-        # (records) orientation first and catching its ValueError: a split
-        # file that omits the optional "index" key parses without error
-        # under the default orientation too - as two columns literally named
-        # "columns" and "data" - so the ValueError this used to rely on
-        # never fires, and the wrong shape comes back silently.
+
+        # Detect split-orient JSON:
+        # {"columns": [...], "data": [...]}, optionally with "index".
+        #
+        # This must be checked before the generic dict-of-dicts detection
+        # below because columns-oriented JSON is also represented as a
+        # dictionary of dictionaries.
         if isinstance(parsed, dict) and {"columns", "data"} <= parsed.keys():
             return pd.read_json(path, orient="split")
+
+        # Detect index-oriented JSON.
+        #
+        # pandas' "columns" and "index" orientations both use a
+        # dict-of-dicts representation, so their shapes are inherently
+        # ambiguous in JSON. A columns-oriented export using the default
+        # DataFrame index has numeric inner keys ("0", "1", ...). Preserve
+        # that existing/common case and treat other scalar dict-of-dicts as
+        # index-oriented.
+        if isinstance(parsed, dict) and parsed and all(
+            isinstance(value, dict) for value in parsed.values()
+        ):
+            inner_key_sets = [set(row.keys()) for row in parsed.values()]
+
+            same_inner_keys = len(
+                {frozenset(keys) for keys in inner_key_sets}
+            ) == 1
+
+            if same_inner_keys:
+                inner_keys = inner_key_sets[0]
+
+                inner_keys_are_default_index = inner_keys == {
+                    str(i) for i in range(len(inner_keys))
+                }
+
+                cells_are_scalar = all(
+                    not isinstance(cell, (dict, list))
+                    for row in parsed.values()
+                    for cell in row.values()
+                )
+
+                if cells_are_scalar and not inner_keys_are_default_index:
+                    return pd.read_json(path, orient="index")
+
         return pd.read_json(path)
 
     if suffix == ".parquet":
@@ -84,4 +119,5 @@ def get_xlsx_sheet_info(path: str) -> tuple[str, list[str]] | None:
         return None
     if not book.sheet_names:
         return None
+
     return book.sheet_names[0], book.sheet_names[1:]
