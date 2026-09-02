@@ -382,7 +382,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: no audit.yaml manifests found under {args.root}", file=sys.stderr)
             return 2
 
-        write_report(fairness_df, performance_df, args.out, make_plots=not args.no_plots)
+        try:
+            write_report(fairness_df, performance_df, args.out, make_plots=not args.no_plots)
+        except ImportError as exc:
+            print(f"error: writing benchmark plots needs matplotlib "
+                  f"(pip install faircode[benchmark]): {exc}", file=sys.stderr)
+            return 2
         n_audits = fairness_df["audit"].nunique()
         print(f"Ran {n_audits} audit(s), wrote {len(fairness_df)} fairness rows and "
               f"{len(performance_df)} performance rows to {args.out}/", file=sys.stderr)

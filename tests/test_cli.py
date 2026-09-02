@@ -678,6 +678,35 @@ def test_cli_benchmark_paper_drift_warning_on_overrides(monkeypatch, tmp_path, c
     assert f"Ran 1 audit(s), wrote 1 fairness rows and 1 performance rows to {out_dir}/" in captured.err
 
 
+def test_cli_benchmark_missing_matplotlib_returns_2_with_clean_error(monkeypatch, tmp_path, capsys):
+    """write_report's lazy `from .figures import generate_figures` (only reached
+    when make_plots=True) used to raise a raw ImportError traceback instead of
+    the same clean error the top-level scikit-learn/pyyaml import already gets."""
+    pytest.importorskip("sklearn", reason="benchmark extra required")
+    pytest.importorskip("fairlearn", reason="benchmark extra required")
+    pytest.importorskip("yaml", reason="benchmark extra required")
+
+    dummy_fairness = pd.DataFrame([{"audit": "German Credit Lending", "metric": "dp"}])
+    dummy_perf = pd.DataFrame([{"audit": "German Credit Lending", "metric": "auc"}])
+
+    monkeypatch.setattr(
+        "faircode.benchmark.run_benchmark",
+        lambda **kwargs: (dummy_fairness, dummy_perf),
+    )
+
+    def raise_import_error(*args, **kwargs):
+        raise ImportError("No module named 'matplotlib'")
+
+    monkeypatch.setattr("faircode.benchmark.write_report", raise_import_error)
+
+    exit_code = main(["benchmark", "--out", str(tmp_path / "results")])
+
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert "error: writing benchmark plots needs matplotlib" in captured.err
+    assert "pip install faircode[benchmark]" in captured.err
+
+
 def test_cli_benchmark_no_manifests_found_error(tmp_path, capsys):
     """Lines 271-273: Error exit path when no audit.yaml manifests are found in --root."""
     pytest.importorskip("sklearn", reason="benchmark extra required")
