@@ -16,6 +16,7 @@ pytest.importorskip("mcp", reason="MCP tools need the optional mcp extra")
 
 from faircode.mcp_server import (  # noqa: E402
     _compare_datasets_impl,
+    RESULTS_FROZEN_FILES,
     _get_benchmark_results_impl,
     _get_explainer_impl,
     _list_explainers_impl,
@@ -450,6 +451,20 @@ def test_get_benchmark_results_no_match_returns_empty_not_an_error():
 def test_get_benchmark_results_invalid_kind_raises():
     with pytest.raises(ValueError, match="kind must be one of"):
         _get_benchmark_results_impl(kind="not_a_real_kind")
+
+
+def test_get_benchmark_results_missing_mirror_names_path_and_safe_recovery(
+        tmp_path, monkeypatch):
+    missing = tmp_path / "faircode" / "_results_frozen" / "results_fairness.csv"
+    monkeypatch.setitem(RESULTS_FROZEN_FILES, "fairness", missing)
+
+    with pytest.raises(FileNotFoundError) as exc_info:
+        _get_benchmark_results_impl()
+
+    message = str(exc_info.value)
+    assert str(missing) in message
+    assert "scripts.freeze_paper_results.mirror_for_mcp()" in message
+    assert "may not have been frozen" not in message
 
 
 @pytest.mark.parametrize("bad_value", [{"x": 1}, ["a", "b"], (1, 2)])
