@@ -82,4 +82,11 @@ jobs:
         run: python3 scripts/check_generated_files_current.py
 
       - name: Fail if a "current explainer count" mention has drifted
+        # CI intentionally only checks, never writes back: a pull_request
+        # run from a fork gets a read-only GITHUB_TOKEN, so it couldn't push
+        # a fix to the contributor's branch even if it tried (the same
+        # reason this workflow stopped auto-committing generated files
+        # straight to main - see the top-of-file comment). Run with --fix
+        # locally (`make fix-explainer-count`) to correct drift in one step
+        # instead of hand-editing four files.
         run: python3 scripts/check_explainer_count.py

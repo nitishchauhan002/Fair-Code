@@ -65,6 +65,7 @@ make check             # everything CI runs: lint + full test suite
 make test              # just the test suite
 make coverage          # test suite with pytest-cov line coverage (informational, not a CI gate)
 make build-explainers  # regenerate explainer pages, sitemap, and OG images (dark + light) after editing explainers/*.md
+make fix-explainer-count  # correct any stale "N explainers" mention in README/CONTRIBUTORS/METRICS/ROADMAP after adding/removing an explainer
 make favicons          # regenerate favicon.ico, apple-touch-icon.png, icon-{192,512}.png after editing logo.svg
 make lint              # em-dash-free check + broken internal doc link check + ruff (unused imports, undefined names)
 ```
