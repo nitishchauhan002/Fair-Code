@@ -37,7 +37,11 @@ faircode-mcp = "faircode.mcp_server:main"
 packages = ["faircode"]
 
 [tool.setuptools.package-data]
-faircode = ["SPEC.md", "MANIFEST_SPEC.md", "_explainers/*.md", "_explainers/data.json"]
+faircode = [
+    "SPEC.md", "MANIFEST_SPEC.md",
+    "_explainers/*.md", "_explainers/data.json",
+    "_results_frozen/*.csv",
+]
 
 [tool.ruff]
 target-version = "py38"

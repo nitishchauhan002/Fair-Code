@@ -10,10 +10,9 @@ boundary the CLI already has: nothing here is a new capability, just a
 different way to call the same profile()/compare()/proxy_hints() functions
 cli.py already wraps. See faircode/SPEC.md section 11 for the tool contract.
 
-Phase 2 (list_explainers, get_explainer) adds read-only lookups against
-this repo's own explainers/ - the plan mentioned in CHANGELOG.md's Phase 1
-note. A results-frozen/ benchmark-results lookup is a possible further
-follow-up, not implemented here.
+Phase 2 (list_explainers, get_explainer, get_benchmark_results) adds
+read-only lookups against this repo's own explainers/ and
+paper/results-frozen/ - the plan mentioned in CHANGELOG.md's Phase 1 note.
 
 Needs the optional 'mcp' extra (`pip install faircode[mcp]`).
 
@@ -34,6 +33,8 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+
+import pandas as pd
 
 from . import __version__
 from .compare import compare
@@ -58,6 +59,18 @@ _MAP_CHOICES = VALID_KINDS + ("ignore",)
 # issue #388). The mirror ships as real package-data instead.
 EXPLAINERS_DIR = Path(__file__).resolve().parent / "_explainers"
 EXPLAINERS_DATA_JSON = EXPLAINERS_DIR / "data.json"
+
+# The other half of the Phase 2 plan: read-only lookups against
+# paper/results-frozen/'s benchmark numbers. Reads from _results_frozen/, a
+# package-internal mirror (scripts/freeze_paper_results.py's
+# mirror_for_mcp()) for the same packaging reason as EXPLAINERS_DIR above -
+# paper/ is never shipped by pyproject.toml either.
+RESULTS_FROZEN_DIR = Path(__file__).resolve().parent / "_results_frozen"
+RESULTS_FROZEN_FILES = {
+    "fairness": RESULTS_FROZEN_DIR / "results_fairness.csv",
+    "performance": RESULTS_FROZEN_DIR / "results_performance.csv",
+}
+_RESULTS_ROW_LIMIT = 200
 
 
 def _read_table_or_raise(path: str):
@@ -270,6 +283,35 @@ def _get_explainer_impl(slug):
     }
 
 
+def _get_benchmark_results_impl(kind="fairness", audit=None, model=None, strategy=None,
+                                metric=None, protected_attribute=None):
+    """Filters the frozen benchmark CSV named by `kind` ("fairness" or
+    "performance") down to rows matching every given (non-None) filter,
+    ignoring a filter that names a column the chosen `kind` doesn't have
+    (e.g. `protected_attribute` against results_performance.csv, which has
+    no such column). Caps the returned rows at _RESULTS_ROW_LIMIT so an
+    unfiltered or loosely-filtered call can't flood the calling agent's
+    context - `total_matches`/`truncated` tell it whether to narrow the
+    query. NaN cells (e.g. results_performance.csv's AUC rows have no
+    ci_low/ci_high) become JSON `null`, never a literal NaN token."""
+    path = RESULTS_FROZEN_FILES.get(kind)
+    if path is None:
+        raise ValueError(f"kind must be one of {sorted(RESULTS_FROZEN_FILES)}, got {kind!r}")
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"{path.name} not found - paper/results-frozen/ may not have been frozen yet "
+            "(see scripts/freeze_paper_results.py)")
+    df = pd.read_csv(path)
+    for column, value in (("audit", audit), ("model", model), ("strategy", strategy),
+                          ("metric", metric), ("protected_attribute", protected_attribute)):
+        if value is not None and column in df.columns:
+            df = df[df[column] == value]
+    total = len(df)
+    head = df.head(_RESULTS_ROW_LIMIT).astype(object)
+    rows = head.where(head.notna(), None).to_dict(orient="records")
+    return {"results": rows, "total_matches": total, "truncated": total > len(rows)}
+
+
 def build_server():
     """Build the MCPServer instance with every Phase 1 and Phase 2 tool
     registered."""
@@ -286,7 +328,8 @@ def build_server():
             "locally, no data leaves this machine. Wraps the same faircode "
             "Python API the `faircode` CLI uses. Also exposes read-only "
             "lookups against this repo's published explainers "
-            "(list_explainers, get_explainer)."
+            "(list_explainers, get_explainer) and frozen benchmark results "
+            "(get_benchmark_results)."
         ),
     )
 
@@ -413,6 +456,35 @@ def build_server():
         """
         try:
             return _get_explainer_impl(slug)
+        except (ValueError, FileNotFoundError) as exc:
+            raise _as_tool_error(exc) from exc
+
+    @server.tool()
+    def get_benchmark_results(kind: str = "fairness", audit: str | None = None,
+                              model: str | None = None, strategy: str | None = None,
+                              metric: str | None = None,
+                              protected_attribute: str | None = None) -> dict:
+        """Query this repo's frozen benchmark results (`paper/results-frozen/`)
+        - the numbers actually cited for each of the seven audits - without
+        shelling out or parsing CSV.
+
+        `kind` is "fairness" (default; demographic_parity_diff,
+        equalized_odds_diff, etc. per protected attribute) or "performance"
+        (accuracy, auc, etc., no protected_attribute column). Every other
+        argument filters by exact match on that column - e.g.
+        `audit="compas", model="logistic_regression", strategy="baseline"`;
+        omit any of them to leave that dimension unfiltered. A filter naming
+        a column `kind` doesn't have (e.g. `protected_attribute` with
+        kind="performance") is simply ignored, not an error.
+
+        Returns {"results": [...], "total_matches": N, "truncated": bool} -
+        results are capped at 200 rows even when more match, so narrow the
+        query with more filters if `truncated` is true rather than assuming
+        the first 200 are representative.
+        """
+        try:
+            return _get_benchmark_results_impl(kind, audit, model, strategy, metric,
+                                               protected_attribute)
         except (ValueError, FileNotFoundError) as exc:
             raise _as_tool_error(exc) from exc
 

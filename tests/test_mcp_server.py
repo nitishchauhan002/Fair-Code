@@ -16,6 +16,7 @@ pytest.importorskip("mcp", reason="MCP tools need the optional mcp extra")
 
 from faircode.mcp_server import (  # noqa: E402
     _compare_datasets_impl,
+    _get_benchmark_results_impl,
     _get_explainer_impl,
     _list_explainers_impl,
     _profile_dataset_impl,
@@ -404,6 +405,53 @@ def test_get_explainer_rejects_path_traversal_and_malformed_slugs(slug):
         _get_explainer_impl(slug)
 
 
+def test_get_benchmark_results_filters_to_matching_rows():
+    # A real, verifiable anchor: COMPAS logistic_regression baseline's race
+    # equal_opportunity_diff is cited as 0.926 in explainers/equal-opportunity.md.
+    result = _get_benchmark_results_impl(
+        audit="compas", model="logistic_regression", strategy="baseline",
+        protected_attribute="race", metric="equal_opportunity_diff")
+
+    assert result["total_matches"] == 1
+    assert result["truncated"] is False
+    row = result["results"][0]
+    assert round(row["value"], 3) == 0.926
+    assert row["significant"] is True
+
+
+def test_get_benchmark_results_performance_kind_ignores_protected_attribute_filter():
+    # results_performance.csv has no protected_attribute column - a filter
+    # naming it should be silently ignored, not raise or return zero rows.
+    result = _get_benchmark_results_impl(
+        kind="performance", audit="compas", model="logistic_regression",
+        protected_attribute="race")
+
+    assert result["total_matches"] > 0
+    assert all(row["audit"] == "compas" for row in result["results"])
+
+
+def test_get_benchmark_results_nan_cells_become_none():
+    # results_performance.csv's auc rows have no ci_low/ci_high.
+    result = _get_benchmark_results_impl(
+        kind="performance", audit="compas", model="logistic_regression",
+        strategy="baseline", metric="auc")
+
+    assert result["total_matches"] == 1
+    assert result["results"][0]["ci_low"] is None
+    assert result["results"][0]["ci_high"] is None
+
+
+def test_get_benchmark_results_no_match_returns_empty_not_an_error():
+    result = _get_benchmark_results_impl(audit="not_a_real_audit")
+
+    assert result == {"results": [], "total_matches": 0, "truncated": False}
+
+
+def test_get_benchmark_results_invalid_kind_raises():
+    with pytest.raises(ValueError, match="kind must be one of"):
+        _get_benchmark_results_impl(kind="not_a_real_kind")
+
+
 def test_build_server_registers_all_phase_one_and_phase_two_tools():
     import asyncio
 
@@ -412,7 +460,7 @@ def test_build_server_registers_all_phase_one_and_phase_two_tools():
 
     assert {t.name for t in tools} == {
         "profile_dataset", "compare_datasets", "proxy_hints",
-        "list_explainers", "get_explainer",
+        "list_explainers", "get_explainer", "get_benchmark_results",
     }
 
 
@@ -470,4 +518,18 @@ def test_get_explainer_tool_error_surfaces_via_call_tool():
         return await server.call_tool("get_explainer", {"slug": "not-a-real-explainer"})
 
     with pytest.raises(ToolError, match="no explainer found for slug"):
+        asyncio.run(call())
+
+
+def test_get_benchmark_results_tool_error_surfaces_via_call_tool():
+    import asyncio
+
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    server = build_server()
+
+    async def call():
+        return await server.call_tool("get_benchmark_results", {"kind": "not_a_real_kind"})
+
+    with pytest.raises(ToolError, match="kind must be one of"):
         asyncio.run(call())

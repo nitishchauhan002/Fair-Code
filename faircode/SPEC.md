@@ -373,6 +373,7 @@ parity obligation of its own - there is no equivalent MCP surface for the JS eng
 | `proxy_hints` | `proxy_hints()` | Returns `{"hints": [...]}`, never a bare list - a list return value gets split by the MCP SDK into one content block per element, and an empty list becomes zero blocks, indistinguishable from an error to a caller |
 | `list_explainers` | `assets/explainers-data.json` | Phase 2: read-only lookup, no analysis. Returns `{"explainers": [{slug, title, subtitle, summary, tags}, ...]}`; optional `tag` filters to explainers carrying it, erroring if none match |
 | `get_explainer` | `explainers/<slug>.md` | Phase 2: returns `{slug, title, subtitle, tags, content}` - `content` is the raw Markdown source. Errors clearly (`FileNotFoundError`) for an unknown slug |
+| `get_benchmark_results` | `paper/results-frozen/results_{fairness,performance}.csv` | Phase 2: filters the frozen CSV named by `kind` on exact-match `audit`/`model`/`strategy`/`metric`/`protected_attribute` (a filter naming a column `kind` doesn't have is ignored). Returns `{results, total_matches, truncated}`, capped at 200 rows |
 
 The first three tools accept `overrides` (the section 1 `{column: kind}` map, as a JSON object rather
 than repeated `--map COL=KIND` strings) and the relevant section 7 thresholds by name.
@@ -403,7 +404,16 @@ CLI's `--proxy-hints-with`, each naming a file whose rows align 1:1 with the pro
 column to pull the dropped attribute's original values from. Parsed via `proxy.py`'s shared
 `parse_held_out_specs`, so the validation is identical to the CLI's. See section 3 and issue #328.
 
-`list_explainers`/`get_explainer` carry no dataset-reading trust boundary at all - they only read
-this repo's own `assets/explainers-data.json` and `explainers/*.md`, never a caller-supplied path -
-and use the same `ValueError`/`FileNotFoundError` → `ToolError` conversion as the other three tools
-for an unknown `tag` or `slug`.
+`list_explainers`/`get_explainer`/`get_benchmark_results` carry no dataset-reading trust boundary at
+all - they only read this repo's own files, never a caller-supplied path - and use the same
+`ValueError`/`FileNotFoundError` → `ToolError` conversion as the other three tools. `get_explainer`'s
+`slug` is validated against the exact pattern every real slug matches (lowercase, digits, hyphens)
+before it's used to build a filesystem path, closing a path-traversal read a malformed slug like
+`"../README"` could otherwise reach (issue #387).
+
+None of `explainers/`, `assets/explainers-data.json`, or `paper/results-frozen/` are files
+`pyproject.toml` actually ships - a real `pip install faircode[mcp]` never has them on disk. All
+three Phase 2 tools instead read a package-internal, generated mirror under `faircode/`
+(`_explainers/`, built by `scripts/build_explainers.py`; `_results_frozen/`, built by
+`scripts/freeze_paper_results.py`), declared as real `package-data` so it ships in the wheel. See
+issue #388, verified by building an actual wheel and installing it in a clean venv.

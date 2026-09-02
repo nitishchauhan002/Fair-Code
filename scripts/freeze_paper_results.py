@@ -20,6 +20,12 @@ Writes paper/results-frozen/:
     results_fairness.csv, results_performance.csv, summary.csv, figures/*.png   (copied verbatim from results/)
     requirements-lock.txt                                                       (copied from repo root)
     MANIFEST.md                                                                 (this snapshot's provenance)
+
+Also mirrors the three CSVs into faircode/_results_frozen/ - a package-internal
+copy for faircode/mcp_server.py's get_benchmark_results tool, for the same
+reason faircode/_explainers/ mirrors explainers/*.md (issue #388): paper/ lives
+outside what pyproject.toml ships, so a real `pip install faircode[mcp]` never
+has it on disk.
 """
 
 from __future__ import annotations
@@ -34,6 +40,21 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = REPO_ROOT / "results"
 FROZEN_DIR = REPO_ROOT / "paper" / "results-frozen"
 LOCKFILE = REPO_ROOT / "requirements-lock.txt"
+MCP_MIRROR_DIR = REPO_ROOT / "faircode" / "_results_frozen"
+MCP_MIRROR_FILES = ("results_fairness.csv", "results_performance.csv", "summary.csv")
+
+
+def mirror_for_mcp():
+    """Copies the three frozen CSVs (not figures/MANIFEST/lockfile - just the
+    tabular data get_benchmark_results reads) from FROZEN_DIR into
+    MCP_MIRROR_DIR, a real Python-package-data location. Safe to call any
+    time FROZEN_DIR already holds a real snapshot - only reads from it, never
+    writes back."""
+    MCP_MIRROR_DIR.mkdir(parents=True, exist_ok=True)
+    for name in MCP_MIRROR_FILES:
+        src = FROZEN_DIR / name
+        if src.exists():
+            shutil.copy2(src, MCP_MIRROR_DIR / name)
 
 
 def _run(cmd):
@@ -134,8 +155,10 @@ def freeze(tag: str | None = None) -> Path:
         ]
 
     (FROZEN_DIR / "MANIFEST.md").write_text("\n".join(manifest_lines) + "\n")
+    mirror_for_mcp()
 
     print(f"Froze {RESULTS_DIR} -> {FROZEN_DIR}")
+    print(f"  MCP mirror: {MCP_MIRROR_DIR}")
     print(f"  commit:    {commit}{'  [DIRTY]' if dirty else ''}")
     print(f"  audits:    {len(manifests)}")
     if tag:
