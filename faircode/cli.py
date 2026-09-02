@@ -239,7 +239,11 @@ def main(argv: list[str] | None = None) -> int:
 
         overrides = _parse_map(args.map)
         _check_map_columns(overrides, df.columns)
-        result = profile(df, overrides, opts)
+        try:
+            result = profile(df, overrides, opts)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
 
         if args.proxy_hints or args.proxy_hints_with:
             held_out = _build_held_out(args.proxy_hints_with, df)

@@ -257,6 +257,15 @@ def test_reference_deviation_and_underrepresentation_flag():
     assert any("'F' under-represented vs reference" in x for x in flags)
 
 
+def test_reference_with_no_matching_dimension_raises_instead_of_silently_no_opping():
+    # A typo'd reference column ("gendr" instead of "sex") used to silently
+    # produce zero reference groups/flags with no error anywhere.
+    df = pd.DataFrame({"sex": ["M"] * 70 + ["F"] * 30})
+    ref = {"gendr": {"M": 0.5, "F": 0.5}}
+    with pytest.raises(ValueError, match="gendr"):
+        profile(df, opts={"reference": ref})
+
+
 def test_intersections_labelize_respects_date_guard():
     # Without the date-vs-age guard, _age_to_numeric() extracts the leading
     # digit run ("15") from both 15/05/1980 and 15/05/1990, banding both into

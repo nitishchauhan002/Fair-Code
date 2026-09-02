@@ -413,6 +413,10 @@ def profile(df: pd.DataFrame, overrides=None, opts=None) -> dict:
 
     ref_flags = []
     if o["reference"]:
+        if not any(d["name"] in o["reference"] for d in dimensions):
+            raise ValueError(
+                "reference file's column(s) don't match any profiled dimension: "
+                + ", ".join(sorted(o["reference"])))
         ref_flags = _apply_reference(dimensions, o["reference"], o["reference_flag"])
 
     if dimensions:

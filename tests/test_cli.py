@@ -314,6 +314,19 @@ def test_profile_reference_missing_required_columns_returns_2_with_clean_error(t
     assert "reference needs column, group, and share columns" in captured.err
 
 
+def test_profile_reference_with_no_matching_dimension_returns_2_with_clean_error(tmp_path, capsys):
+    path = tmp_path / "a.csv"
+    path.write_text("sex\nM\nM\nF\n", encoding="utf-8")
+    ref_path = tmp_path / "ref.csv"
+    ref_path.write_text("column,group,share\ngendr,M,0.5\ngendr,F,0.5\n", encoding="utf-8")
+
+    exit_code = main(["profile", str(path), "--reference", str(ref_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "reference file's column(s) don't match any profiled dimension: gendr" in captured.err
+
+
 def test_profile_proxy_hints_runtime_error_returns_2_with_clean_error(tmp_path, capsys, monkeypatch):
     path = tmp_path / "a.csv"
     path.write_text("sex\nM\nF\n", encoding="utf-8")
