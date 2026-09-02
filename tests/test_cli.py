@@ -301,6 +301,17 @@ def test_profile_cross_same_column_twice_returns_2_with_clean_error(tmp_path, ca
     assert "--cross needs two different columns, got 'sex' twice" in captured.err
 
 
+def test_profile_cross_unknown_column_returns_2_with_clean_error(tmp_path, capsys):
+    path = tmp_path / "a.csv"
+    path.write_text("sex,race\n" + "M,A\nF,B\n" * 25, encoding="utf-8")
+
+    exit_code = main(["profile", str(path), "--cross", "sex,raace"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "cross column(s) don't match any profiled dimension: raace" in captured.err
+
+
 def test_profile_reference_missing_required_columns_returns_2_with_clean_error(tmp_path, capsys):
     path = tmp_path / "a.csv"
     path.write_text("sex\nM\nF\n", encoding="utf-8")

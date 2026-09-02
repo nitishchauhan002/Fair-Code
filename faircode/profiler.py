@@ -409,6 +409,11 @@ def profile(df: pd.DataFrame, overrides=None, opts=None) -> dict:
                   or d["n_groups"] <= MAX_DIMENSION_GROUPS]
     kept_names = {d["name"] for d in dimensions}
     detected = [d for d in detected if d["name"] in kept_names]
+    if o["cross"]:
+        unknown = [name for name in o["cross"] if name not in kept_names]
+        if unknown:
+            raise ValueError(
+                "cross column(s) don't match any profiled dimension: " + ", ".join(unknown))
     intersections = _intersections(df, detected, o["intersection_floor"], o["cross"])
 
     ref_flags = []

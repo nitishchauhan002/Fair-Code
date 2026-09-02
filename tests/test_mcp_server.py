@@ -89,6 +89,14 @@ def test_profile_dataset_cross_with_one_column_raises(tmp_path):
         _profile_dataset_impl(str(path), cross=["sex"])
 
 
+def test_profile_dataset_cross_unknown_column_raises(tmp_path):
+    path = tmp_path / "a.csv"
+    path.write_text("sex,race\n" + "M,W\nF,B\n" * 25, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="raace"):
+        _profile_dataset_impl(str(path), cross=["sex", "raace"])
+
+
 def test_profile_dataset_reference_path_adds_reference_hash_to_provenance(tmp_path):
     path = tmp_path / "a.csv"
     path.write_text("sex\n" + "M\n" * 5 + "F\n" * 5, encoding="utf-8")

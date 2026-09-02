@@ -238,10 +238,13 @@ def test_cross_selects_intersection_pair():
     assert default[0]["dims"] != ["race", "age"]  # first two were sex × race
 
 
-def test_cross_falls_back_when_column_missing():
+def test_cross_with_unknown_column_raises_instead_of_silently_falling_back():
+    # A typo'd --cross column used to silently fall back to the first two
+    # detected dimensions instead of erroring on the name the caller
+    # actually asked for (issue #384).
     df = pd.DataFrame({"sex": ["M", "F"] * 50, "race": ["White", "Black"] * 50})
-    inter = profile(df, opts={"cross": ["sex", "nonexistent"]})["intersections"]
-    assert inter[0]["dims"] == ["sex", "race"]  # fell back to first two
+    with pytest.raises(ValueError, match="nonexistent"):
+        profile(df, opts={"cross": ["sex", "nonexistent"]})
 
 
 # ── Reference baseline (issue #56) ───────────────────────────────────────────
