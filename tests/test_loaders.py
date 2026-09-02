@@ -119,6 +119,25 @@ def test_read_table_parquet(tmp_path):
     assert len(df) == 4
 
 
+def test_read_table_parquet_missing_pyarrow_raises_clean_runtime_error(tmp_path, monkeypatch):
+    # Simulates pyarrow genuinely being unavailable at the loaders_extra.py
+    # level - tests/test_cli.py's equivalent test only monkeypatches
+    # read_table itself, never exercising the real
+    # `except ImportError as exc: raise RuntimeError(...)` conversion.
+    import faircode.loaders_extra as loaders_extra
+
+    path = tmp_path / "data.parquet"
+    path.write_text("not a real parquet file", encoding="utf-8")
+
+    def raise_import_error(*args, **kwargs):
+        raise ImportError("No module named 'pyarrow'")
+
+    monkeypatch.setattr(loaders_extra.pd, "read_parquet", raise_import_error)
+
+    with pytest.raises(RuntimeError, match="reading .parquet files requires the 'pyarrow' package"):
+        read_table(str(path))
+
+
 def test_read_table_unknown_extension_sniffs_tabs(tmp_path):
     path = tmp_path / "data.txt"
     _write_csv(path, sep="\t")
