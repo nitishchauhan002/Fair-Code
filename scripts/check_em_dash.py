@@ -19,9 +19,9 @@ from pathlib import Path
 EM_DASH = "\u2014"  # em dash, the forbidden character
 EN_DASH = "\u2013"  # en dash, allowed for numeric ranges
 
-# Only contributor-facing source/prose is scanned. Data (.csv), config (.yml),
+# Tracked text files with these extensions are scanned for em dashes. Data (.csv)
 # and dependency pins (.txt) are deliberately out of scope.
-SCAN_EXT = {".md", ".py", ".js", ".html", ".css"}
+SCAN_EXT = {".md", ".py", ".js", ".html", ".css", ".yml", ".yaml"}
 
 # Opt-out path list (the escape hatch): files that legitimately contain an em
 # dash, or that must not be edited. Keep this list short and justified.
@@ -30,6 +30,9 @@ ALLOWLIST = {
     "faircode/significance.py",
     # Documents the rule itself and shows em dashes as the anti-pattern to avoid.
     "CONTRIBUTING.md",
+    # Same reason: demonstrates the banned character inside a checkbox label.
+    ".github/ISSUE_TEMPLATE/new_audit.yml",
+    ".github/ISSUE_TEMPLATE/new_explainer.yml",
 }
 ALLOW_PREFIXES = ("paper/results-frozen/",)  # frozen evidence, never modified
 
