@@ -9,6 +9,7 @@
   'use strict';
 
   var DISPLAY_GROUPS = 12; // mirror faircode/report.py
+  var FAIRCODE_VERSION = '2.1.0'; // mirrors profiler-ui.js's own copy
   var E = window.FairCodeProfiler;
   if (!E || !E.compare) return;
 
@@ -62,6 +63,31 @@
     return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 
+  // Ported from profiler-ui.js's fileDigest (issue #375) - hashes the raw
+  // File object's bytes, or reports why it can't (in-memory sample data,
+  // a read failure) so a Compare export can be tied back to what produced
+  // it the same way the Profile view's export and the CLI/MCP provenance
+  // block already can.
+  async function fileDigest(file) {
+    if (!file) {
+      return {
+        digest: null,
+        note: 'dataset was generated in memory; raw bytes were not retained'
+      };
+    }
+    try {
+      var buffer = await file.arrayBuffer();
+      var hash = await crypto.subtle.digest('SHA-256', buffer);
+      var bytes = new Uint8Array(hash);
+      var hex = Array.prototype.map.call(bytes, function (b) {
+        return b.toString(16).padStart(2, '0');
+      }).join('');
+      return { digest: 'sha256:' + hex, note: null };
+    } catch (err) {
+      return { digest: null, note: 'could not read file for hashing: ' + err.message };
+    }
+  }
+
   // ── File wiring for one slot ('A' or 'B') ──────────────────────────────
   function wireSlot(key, drop, input, nameEl) {
     drop.addEventListener('click', function () { input.click(); });
@@ -104,7 +130,7 @@
       if (!table.columns.length || !table.rows.length) {
         return showError('Dataset ' + key + ' looks empty or has no data rows.');
       }
-      setSlot(key, table, file.name, drop, nameEl);
+      setSlot(key, table, file.name, drop, nameEl, file);
     }
 
     if (/\.xlsx$/i.test(file.name)) {
@@ -144,8 +170,8 @@
     }
   }
 
-  function setSlot(key, table, name, drop, nameEl) {
-    slot[key] = { table: table, name: name };
+  function setSlot(key, table, name, drop, nameEl, file) {
+    slot[key] = { table: table, name: name, file: file || null };
     nameEl.textContent = name;
     drop.classList.add('loaded');
     errorEl.hidden = true;
@@ -564,9 +590,26 @@
     return ok;
   }
 
-  function copyCompareResultAsJSON() {
+  async function copyCompareResultAsJSON() {
     if (!currentCmp) return;
-    var text = JSON.stringify(currentCmp, null, 2);
+
+    var hashA = await fileDigest(slot.A && slot.A.file);
+    var hashB = await fileDigest(slot.B && slot.B.file);
+
+    var provenance = {
+      faircode_version: FAIRCODE_VERSION,
+      engine: 'js',
+      dataset_hash_a: hashA.digest,
+      dataset_hash_b: hashB.digest,
+      params: Object.assign({}, currentOpts),
+      overrides: Object.assign({}, currentOverrides)
+    };
+    if (hashA.note !== null) provenance.dataset_hash_a_note = hashA.note;
+    if (hashB.note !== null) provenance.dataset_hash_b_note = hashB.note;
+
+    var exported = Object.assign({}, currentCmp, { provenance: provenance });
+    var text = JSON.stringify(exported, null, 2);
+
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () {
         flashButton(copyJsonBtn, '✓ Copied');
