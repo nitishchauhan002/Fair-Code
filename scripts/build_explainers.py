@@ -31,6 +31,15 @@ SITEMAP = ROOT / "sitemap.xml"
 LLMS_FULL = ROOT / "llms-full.txt"
 OG_DIR = ROOT / "assets" / "og"
 OG_LIGHT_DIR = ROOT / "assets" / "og-light"
+
+# A generated, package-internal mirror of explainers/*.md + explainers-data.json
+# for faircode/mcp_server.py's list_explainers/get_explainer tools. explainers/
+# and assets/ live at the repo root, outside the faircode/ package pyproject.toml
+# actually ships - a real `pip install faircode[mcp]` never has them on disk, so
+# the MCP tools need their own copy that IS inside the installed package (issue
+# #388). Mirrors the same "generated copy for a different consumer" precedent
+# assets/explainers-data.js already is for the browser.
+PACKAGE_MIRROR_DIR = ROOT / "faircode" / "_explainers"
 SITE_URL = "https://www.thefaircode.xyz"
 REPO_URL = "https://github.com/yakew7/Fair-Code"
 
@@ -633,6 +642,26 @@ def build_llms_full(entries):
     return "\n".join(parts) + "\n"
 
 
+def build_package_mirror(entries):
+    """Copies assets/explainers-data.json -> faircode/_explainers/data.json
+    and every explainers/<slug>.md -> faircode/_explainers/<slug>.md, so the
+    installed faircode package carries its own copy for
+    mcp_server.py's list_explainers/get_explainer tools (issue #388) -
+    removing any stale slug left over from a previously-published explainer
+    that no longer exists."""
+    PACKAGE_MIRROR_DIR.mkdir(parents=True, exist_ok=True)
+    current_slugs = {entry["slug"] for entry in entries}
+    for existing in PACKAGE_MIRROR_DIR.glob("*.md"):
+        if existing.stem not in current_slugs:
+            existing.unlink()
+    (PACKAGE_MIRROR_DIR / "data.json").write_text(
+        DATA_JSON.read_text(encoding="utf-8"), encoding="utf-8")
+    for entry in entries:
+        slug = entry["slug"]
+        (PACKAGE_MIRROR_DIR / f"{slug}.md").write_text(
+            (EXPLAINERS_DIR / f"{slug}.md").read_text(encoding="utf-8"), encoding="utf-8")
+
+
 def main():
     entries = json.loads(DATA_JSON.read_text(encoding="utf-8"))
     known_slugs = {entry["slug"] for entry in entries}
@@ -672,9 +701,10 @@ def main():
     DATA_JS.write_text(build_data_js(entries), encoding="utf-8")
     SITEMAP.write_text(build_sitemap(entries), encoding="utf-8")
     LLMS_FULL.write_text(build_llms_full(entries), encoding="utf-8")
+    build_package_mirror(entries)
 
     print(f"Generated {len(entries)} explainer pages, assets/explainers-data.js, "
-          "sitemap.xml, and llms-full.txt")
+          "sitemap.xml, llms-full.txt, and faircode/_explainers/ (MCP package mirror)")
 
 
 if __name__ == "__main__":

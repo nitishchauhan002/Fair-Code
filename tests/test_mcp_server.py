@@ -156,6 +156,14 @@ def test_profile_dataset_cross_unknown_column_raises(tmp_path):
         _profile_dataset_impl(str(path), cross=["sex", "raace"])
 
 
+def test_profile_dataset_cross_same_column_twice_raises(tmp_path):
+    path = tmp_path / "a.csv"
+    path.write_text("sex,race\n" + "M,W\nF,B\n" * 25, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="cross needs two different columns, got 'sex' twice"):
+        _profile_dataset_impl(str(path), cross=["sex", "sex"])
+
+
 def test_profile_dataset_reference_path_adds_reference_hash_to_provenance(tmp_path):
     path = tmp_path / "a.csv"
     path.write_text("sex\n" + "M\n" * 5 + "F\n" * 5, encoding="utf-8")
@@ -376,6 +384,24 @@ def test_get_explainer_returns_content_and_metadata():
 def test_get_explainer_unknown_slug_raises():
     with pytest.raises(FileNotFoundError, match="no explainer found for slug"):
         _get_explainer_impl("not-a-real-explainer")
+
+
+@pytest.mark.parametrize("slug", [
+    "../README",
+    "../../README",
+    "../CLAUDE",
+    "explainers/../../README",
+    "sub/dir",
+    "UPPERCASE",
+    "has space",
+    "trailing.md.md",
+])
+def test_get_explainer_rejects_path_traversal_and_malformed_slugs(slug):
+    # slug is caller-controlled text used to build a filesystem path - a
+    # traversal-shaped value used to escape explainers/ and read an
+    # arbitrary file elsewhere in the repo (issue #387).
+    with pytest.raises(FileNotFoundError, match="no explainer found for slug"):
+        _get_explainer_impl(slug)
 
 
 def test_build_server_registers_all_phase_one_and_phase_two_tools():

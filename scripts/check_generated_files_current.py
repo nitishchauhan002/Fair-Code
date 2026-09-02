@@ -67,6 +67,8 @@ TEXT_GLOBS = [
     "assets/explainers-data.js",
     "sitemap.xml",
     "llms-full.txt",
+    "faircode/_explainers/*.md",
+    "faircode/_explainers/data.json",
 ]
 
 _JSONLD_DATE_LINE = re.compile(

@@ -37,6 +37,14 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# faircode/_explainers/*.md is a generated, package-internal mirror of
+# explainers/*.md (issue #388) - its files are byte-identical copies, so
+# every relative link inside them is only valid relative to the ORIGINAL
+# explainers/ directory the copy was made from, not the mirror's own,
+# more-nested location. Checking the source in explainers/ already covers
+# these links; checking the copy too would just be false positives.
+ALLOW_PREFIXES = ("faircode/_explainers/",)
+
 FENCE_RE = re.compile(r'^\s*```')
 HEADING_RE = re.compile(r'^(#{1,6})\s+(.*?)\s*#*$')
 LINK_RE = re.compile(r'(?<!!)\[[^\]]*\]\(([^)]+)\)')
@@ -53,7 +61,10 @@ def _tracked_markdown_files():
     out = subprocess.run(
         ["git", "ls-files", "*.md"], capture_output=True, text=True, check=True
     ).stdout
-    return [ROOT / line for line in out.splitlines() if line.strip()]
+    return [
+        ROOT / line for line in out.splitlines()
+        if line.strip() and not line.startswith(ALLOW_PREFIXES)
+    ]
 
 
 def _strip_inline_formatting(text):

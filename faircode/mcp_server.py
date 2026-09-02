@@ -32,6 +32,7 @@ withholding the real text.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from . import __version__
@@ -48,9 +49,15 @@ _MAP_CHOICES = VALID_KINDS + ("ignore",)
 # Phase 2 of the plan discussed for #327-#329 (see CHANGELOG.md's Phase 1
 # note): read-only lookups against explainers/, so an agent can discover and
 # read an explainer without shelling out or re-deriving the index itself.
-ROOT = Path(__file__).resolve().parent.parent
-EXPLAINERS_DIR = ROOT / "explainers"
-EXPLAINERS_DATA_JSON = ROOT / "assets" / "explainers-data.json"
+#
+# Reads from _explainers/, a generated mirror INSIDE this package (built by
+# scripts/build_explainers.py's build_package_mirror()) rather than the
+# repo-root explainers/ and assets/ directories directly: those live outside
+# what pyproject.toml actually ships, so a real `pip install faircode[mcp]`
+# never has them on disk at all - only a git-checkout dev install would (see
+# issue #388). The mirror ships as real package-data instead.
+EXPLAINERS_DIR = Path(__file__).resolve().parent / "_explainers"
+EXPLAINERS_DATA_JSON = EXPLAINERS_DIR / "data.json"
 
 
 def _read_table_or_raise(path: str):
@@ -118,6 +125,8 @@ def _build_opts(min_share=None, intersection_floor=None, imbalance_flag=None,
     if cross:
         if len(cross) != 2 or not all(cross):
             raise ValueError("cross expects exactly two column names")
+        if cross[0] == cross[1]:
+            raise ValueError(f"cross needs two different columns, got '{cross[0]}' twice")
         opts["cross"] = list(cross)
     if reference_path:
         opts["reference"] = parse_reference(_read_table_or_raise(reference_path))
@@ -232,12 +241,24 @@ def _list_explainers_impl(tag=None):
     ]}
 
 
+_SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+
+
 def _get_explainer_impl(slug):
     """Returns one explainer's full Markdown source plus its metadata, by
-    slug (as listed by list_explainers). Raises a clear error for an unknown
-    slug rather than a raw FileNotFoundError with a confusing local path."""
+    slug (as listed by list_explainers). Raises the same "no explainer
+    found" error for an unknown slug, a malformed one, or a path-traversal
+    attempt (e.g. "../README") - `slug` is caller-controlled text used to
+    build a filesystem path, so it's validated against the exact pattern
+    every real slug actually matches (lowercase, digits, hyphens) before
+    that path is ever built, plus a belt-and-suspenders check that the
+    resolved path still lands under EXPLAINERS_DIR. See issue #387."""
+    if not _SLUG_RE.match(slug):
+        raise FileNotFoundError(f"no explainer found for slug {slug!r}")
     path = EXPLAINERS_DIR / f"{slug}.md"
-    if not path.is_file():
+    resolved_dir = str(EXPLAINERS_DIR.resolve())
+    # Path.is_relative_to() needs Python 3.9+; this package supports 3.8.
+    if not str(path.resolve()).startswith(resolved_dir + "/") or not path.is_file():
         raise FileNotFoundError(f"no explainer found for slug {slug!r}")
     meta = next((e for e in _load_explainers_metadata() if e["slug"] == slug), {})
     return {
