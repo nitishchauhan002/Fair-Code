@@ -21,6 +21,21 @@ def _tracked_files():
     return [line.strip() for line in out.splitlines() if line.strip()]
 
 
+def _split_codeowners_line(line):
+    """Split one line into (pattern, owners), honoring GitHub's
+    backslash-escaped-space syntax in the pattern (needed for a path like
+    /AI\\ Fair\\ Recruitment/ - see #379). Owner handles never contain
+    spaces, so a naive whitespace split breaks the pattern into multiple
+    tokens wherever it has an escaped space; this reassembles it."""
+    tokens = line.split()
+    pattern = tokens[0]
+    i = 1
+    while pattern.endswith("\\") and i < len(tokens):
+        pattern = pattern[:-1] + " " + tokens[i]
+        i += 1
+    return pattern, tokens[i:]
+
+
 def _parse_codeowners_paths():
     """Return [(line_no, pattern, owners)] for every non-comment, non-blank line."""
     entries = []
@@ -28,8 +43,8 @@ def _parse_codeowners_paths():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
-        parts = line.split()
-        entries.append((line_no, parts[0], parts[1:]))
+        pattern, owners = _split_codeowners_line(line)
+        entries.append((line_no, pattern, owners))
     return entries
 
 
@@ -51,6 +66,33 @@ def _pattern_matches_a_tracked_path(pattern, tracked):
 
 def test_codeowners_file_exists():
     assert CODEOWNERS_PATH.is_file(), ".github/CODEOWNERS is missing"
+
+
+def test_split_codeowners_line_handles_escaped_spaces():
+    pattern, owners = _split_codeowners_line(r"/AI\ Fair\ Recruitment/ @yakew7 @ahmdkaml")
+    assert pattern == "/AI Fair Recruitment/"
+    assert owners == ["@yakew7", "@ahmdkaml"]
+
+
+def test_audit_directories_are_covered_by_a_codeowners_entry():
+    # #379: every audit dataset directory (fair.py/unfair.py/CSVs/notebooks -
+    # everything besides audit.yaml, which **/audit.yaml already covers) had
+    # no owner at all until this test's own entries were added.
+    audit_dirs = [
+        "AI Fair Recruitment", "Benefits Denial", "COMPAS",
+        "German Credit Lending", "Healthcare Readmission",
+        "Insurance Denial", "Tenant Screening",
+    ]
+    tracked = _tracked_files()
+    entries = _parse_codeowners_paths()
+    patterns = [pattern for _line_no, pattern, _owners in entries]
+
+    for audit_dir in audit_dirs:
+        files = [t for t in tracked if t.startswith(audit_dir + "/") and not t.endswith("/audit.yaml")]
+        assert files, f"no tracked non-manifest files found under {audit_dir!r}"
+        assert any(_pattern_matches_a_tracked_path(p, [files[0]]) for p in patterns), (
+            f"{audit_dir!r} has tracked files with no matching CODEOWNERS entry"
+        )
 
 
 def test_every_codeowners_path_matches_a_tracked_file_or_directory():
