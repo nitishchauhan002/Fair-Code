@@ -31,6 +31,7 @@ body:
       options:
         - unfair.py
         - fair.py
+        - audit.yaml
         - Jupyter notebook
         - Other
     validations:
