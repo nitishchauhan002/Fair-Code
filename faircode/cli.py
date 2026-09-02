@@ -76,7 +76,23 @@ def _build_held_out(specs, df):
     """Parse repeated --proxy-hints-with PATH=COLUMN flags via proxy.py's
     shared parse_held_out_specs, printing a plain error and raising
     SystemExit(2) on any parse failure, missing column, or row-count
-    mismatch - _read_or_exit already does the same for an unreadable path."""
+    mismatch - _read_or_exit already does the same for an unreadable path.
+
+    Also prints the same ignored-sheet notice the main dataset path already
+    gets for a multi-sheet .xlsx file - a held-out file is a third dataset
+    input, and only reading sheet 0 without saying so would otherwise be
+    silently inconsistent with every other input path."""
+    for spec in specs or []:
+        path = spec.partition("=")[0]
+        sheet_info = get_xlsx_sheet_info(path)
+        if sheet_info is not None:
+            sheet_name, ignored_sheets = sheet_info
+            if ignored_sheets:
+                print(
+                    f"{path}: read sheet '{sheet_name}' - {len(ignored_sheets)} "
+                    f"other sheet(s) ignored.",
+                    file=sys.stderr,
+                )
     try:
         return parse_held_out_specs(specs, df, _read_or_exit)
     except ValueError as exc:

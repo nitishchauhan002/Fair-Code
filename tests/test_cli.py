@@ -421,6 +421,33 @@ def test_proxy_hints_with_row_count_mismatch_returns_2_with_clean_error(tmp_path
     assert "rows must align 1:1" in captured.err
 
 
+@requires_openpyxl
+def test_proxy_hints_with_xlsx_reports_ignored_sheets(tmp_path, capsys):
+    import openpyxl
+
+    path = tmp_path / "a.csv"
+    path.write_text("sex\n" + "M\n" * 50 + "F\n" * 50, encoding="utf-8")
+
+    held_path = tmp_path / "multi_sheet.xlsx"
+    wb = openpyxl.Workbook()
+    first = wb.active
+    first.title = "Data"
+    first.append(["race"])
+    for _ in range(50):
+        first.append(["A"])
+    for _ in range(50):
+        first.append(["B"])
+    wb.create_sheet("Notes")
+    wb.save(held_path)
+
+    exit_code = main(["profile", str(path), "--proxy-hints",
+                      "--proxy-hints-with", f"{held_path}=race"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert f"{held_path}: read sheet 'Data' - 1 other sheet(s) ignored." in captured.err
+
+
 def test_proxy_hints_with_without_proxy_hints_returns_2_with_clean_error(tmp_path, capsys):
     path = tmp_path / "a.csv"
     path.write_text("sex\nM\nF\n", encoding="utf-8")
