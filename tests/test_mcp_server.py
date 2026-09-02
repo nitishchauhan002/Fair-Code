@@ -138,6 +138,37 @@ def test_compare_datasets_unknown_override_column_raises(tmp_path):
         _compare_datasets_impl(str(path_a), str(path_b), overrides={"nope": "sex"})
 
 
+def test_compare_datasets_proxy_hints_defaults_off(tmp_path):
+    path_a = tmp_path / "a.csv"
+    path_a.write_text("sex\nM\nF\n", encoding="utf-8")
+    path_b = tmp_path / "b.csv"
+    path_b.write_text("sex\nM\nM\n", encoding="utf-8")
+
+    result = _compare_datasets_impl(str(path_a), str(path_b))
+
+    assert "proxy_hints_a" not in result
+    assert "proxy_hints_b" not in result
+
+
+@requires_scipy
+def test_compare_datasets_proxy_hints_attaches_hints_for_both_datasets(tmp_path):
+    # occupation is a perfect function of sex in both files -> maximal association.
+    rows = ["sex,occupation"] + [
+        f"{'male' if i % 2 == 0 else 'female'},{'engineer' if i % 2 == 0 else 'nurse'}"
+        for i in range(100)
+    ]
+    path_a = tmp_path / "a.csv"
+    path_a.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    path_b = tmp_path / "b.csv"
+    path_b.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+    result = _compare_datasets_impl(str(path_a), str(path_b), proxy_hints=True)
+
+    for key in ("proxy_hints_a", "proxy_hints_b"):
+        pair = next(h for h in result[key] if {h["a"], h["b"]} == {"sex", "occupation"})
+        assert pair["p_value"] < 0.05
+
+
 @requires_scipy
 def test_proxy_hints_returns_a_dict_with_a_hints_key(tmp_path):
     # occupation is a perfect function of sex -> maximal association.

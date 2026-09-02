@@ -107,7 +107,8 @@ def _profile_dataset_impl(path, overrides=None, cross=None, reference_path=None,
 def _compare_datasets_impl(path_a, path_b, overrides=None,
                            min_share=None, intersection_floor=None,
                            imbalance_flag=None, missing_flag=None,
-                           min_group_size=None, include_provenance=True):
+                           min_group_size=None, include_provenance=True,
+                           proxy_hints=False):
     overrides = overrides or {}
     df_a = _read_table_or_raise(path_a)
     df_b = _read_table_or_raise(path_b)
@@ -117,6 +118,9 @@ def _compare_datasets_impl(path_a, path_b, overrides=None,
     profile_a = profile(df_a, overrides, opts)
     profile_b = profile(df_b, overrides, opts)
     result = compare(profile_a, profile_b, name_a=path_a, name_b=path_b)
+    if proxy_hints:
+        result["proxy_hints_a"] = compute_proxy_hints(df_a, profile_a["dimensions"])
+        result["proxy_hints_b"] = compute_proxy_hints(df_b, profile_b["dimensions"])
     if include_provenance:
         provenance = build_provenance(
             [("dataset_hash_a", path_a), ("dataset_hash_b", path_b)],
@@ -218,7 +222,8 @@ def build_server():
                          imbalance_flag: float | None = None,
                          missing_flag: float | None = None,
                          min_group_size: int | None = None,
-                         include_provenance: bool = True) -> dict:
+                         include_provenance: bool = True,
+                         proxy_hints: bool = False) -> dict:
         """Compare two tabular datasets (e.g. a training set and a production
         snapshot) for representation drift: which dimensions/groups appeared,
         disappeared, or shifted share, plus a population-stability-index-based
@@ -226,11 +231,19 @@ def build_server():
         applied identically to both datasets - see profile_dataset for what
         each one does. `include_provenance` (default true) attaches
         `dataset_hash_a`/`dataset_hash_b` alongside the resolved thresholds.
+
+        `proxy_hints` (default false), when true, attaches `proxy_hints_a`/
+        `proxy_hints_b` - the same chi-squared proxy-hint pairs the standalone
+        `proxy_hints` tool computes, run separately against each dataset - so
+        a single call can get drift and both datasets' proxy hints together,
+        matching `faircode compare --proxy-hints`. Needs the optional 'scipy'
+        extra (`pip install faircode[proxy]`).
         """
         try:
             return _compare_datasets_impl(
                 path_a, path_b, overrides, min_share, intersection_floor,
-                imbalance_flag, missing_flag, min_group_size, include_provenance)
+                imbalance_flag, missing_flag, min_group_size, include_provenance,
+                proxy_hints)
         except (ValueError, FileNotFoundError, RuntimeError) as exc:
             raise _as_tool_error(exc) from exc
 
