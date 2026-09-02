@@ -11,8 +11,8 @@ different way to call the same profile()/compare()/proxy_hints() functions
 cli.py already wraps. See faircode/SPEC.md section 11 for the tool contract.
 
 Phase 2 (list_explainers, get_explainer, get_benchmark_results) adds
-read-only lookups against this repo's own explainers/ and
-paper/results-frozen/ - the plan mentioned in CHANGELOG.md's Phase 1 note.
+read-only lookups against package-internal mirrors of this repo's explainers/
+and frozen benchmark results - the plan mentioned in CHANGELOG.md's Phase 1 note.
 
 Needs the optional 'mcp' extra (`pip install faircode[mcp]`).
 
@@ -299,8 +299,8 @@ def _get_benchmark_results_impl(kind="fairness", audit=None, model=None, strateg
         raise ValueError(f"kind must be one of {sorted(RESULTS_FROZEN_FILES)}, got {kind!r}")
     if not path.is_file():
         raise FileNotFoundError(
-            f"{path.name} not found - paper/results-frozen/ may not have been frozen yet "
-            "(see scripts/freeze_paper_results.py)")
+            f"{path} not found - restore the package mirror from paper/results-frozen/ "
+            "with `scripts.freeze_paper_results.mirror_for_mcp()`")
     df = pd.read_csv(path)
     for column, value in (("audit", audit), ("model", model), ("strategy", strategy),
                           ("metric", metric), ("protected_attribute", protected_attribute)):

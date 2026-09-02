@@ -35,6 +35,7 @@ first shipped.
 - **`get_explainer` had a path-traversal vulnerability via `slug`** (closes #387) - `slug="../README"` returned this repo's `README.md` content, a file entirely outside `explainers/`, since `slug` was used to build a filesystem path with zero validation. Now validated against the exact pattern every real slug matches before the path is ever built.
 - **`profile_dataset`'s `cross` validation didn't reject the same column twice, unlike the CLI** (closes #389) - `cross=["sex","sex"]` silently produced a degenerate diagonal-only intersection table instead of erroring like `faircode profile --cross sex,sex` already does.
 - **`get_benchmark_results` crashed uncaught or leaked raw pandas errors on a non-scalar filter value** (closes #390) - a dict value raised an uncaught `NotImplementedError` (not in the tool wrapper's except tuple); a list value raised `ValueError` with pandas' own internal wording. Each filter is now validated as a plain scalar first.
+- **`get_benchmark_results` blamed the wrong file when its package mirror was missing** (closes #396) - the error now names the actual missing `faircode/_results_frozen/` path and points to `scripts.freeze_paper_results.mirror_for_mcp()`, avoiding advice that could trigger an unnecessary, citation-affecting re-freeze.
 - **README.md's MCP section still listed only the original 3 tools** (closes #391) - `SPEC.md` section 11 was already correctly updated for all six.
 
 ## [2.1.1] - 02 Sep 2026
