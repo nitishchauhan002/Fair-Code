@@ -258,3 +258,32 @@ def test_tool_errors_surface_the_anticipated_message_not_a_generic_one():
 
     with pytest.raises(ToolError, match="file not found: definitely-missing.csv"):
         asyncio.run(call())
+
+
+def test_compare_datasets_tool_error_surfaces_via_call_tool():
+    import asyncio
+
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    server = build_server()
+
+    async def call():
+        return await server.call_tool(
+            "compare_datasets", {"path_a": "definitely-missing.csv", "path_b": "also-missing.csv"})
+
+    with pytest.raises(ToolError, match="file not found: definitely-missing.csv"):
+        asyncio.run(call())
+
+
+def test_proxy_hints_tool_error_surfaces_via_call_tool():
+    import asyncio
+
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    server = build_server()
+
+    async def call():
+        return await server.call_tool("proxy_hints", {"path": "definitely-missing.csv"})
+
+    with pytest.raises(ToolError, match="file not found: definitely-missing.csv"):
+        asyncio.run(call())
